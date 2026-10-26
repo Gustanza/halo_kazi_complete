@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #f3f3f3;
+  --color-surface: #ffffff;
+  --color-text: #14213d;
+  --color-text-muted: #6b7280;
+  --color-border: #e6e8eb;
+  --color-peach: #f3d5c4;
+  --color-peach-light: #fbeae0;
+  --color-purple-tint: #ece0fb;
+}
+
+.dark {
+  --color-bg: #0e1730;
+  --color-surface: #16213f;
+  --color-text: #f3f3f3;
+  --color-text-muted: #a3acc2;
+  --color-border: #263257;
+  --color-peach: #3a2b2a;
+  --color-peach-light: #2c2320;
+  --color-purple-tint: #2a2140;
+}
+
+:root {
+  /* Strong custom easings - the built-in CSS ones are too weak to feel intentional. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+* {
+  scrollbar-width: thin;
+}
+
+html,
+body {
+  @apply antialiased;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.container-page {
+  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+}
+
+/* Full-bleed variant for the header and footer only - runs edge to edge. */
+.container-bleed {
+  @apply w-full px-4 sm:px-6 lg:px-10;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card hover:bg-primary-600 hover:shadow-lg active:scale-[0.97];
+  transition: transform 150ms var(--ease-out), background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.btn-outline {
+  @apply inline-flex items-center justify-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-3 text-sm font-semibold text-[var(--color-text)] hover:border-primary hover:text-primary active:scale-[0.97];
+  transition: transform 150ms var(--ease-out), border-color 150ms ease, color 150ms ease;
+}
+
+.card-surface {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  @apply rounded-2xl shadow-card;
+}
+
+section[id] {
+  scroll-margin-top: 96px;
+}
+
+.eyebrow {
+  @apply text-xs font-bold uppercase tracking-wider text-primary;
+}
+
+/* ---------- Motion ---------- */
+
+/* Hover lift, gated to real pointers so touch doesn't get stuck "hovered". */
+.card-hover {
+  transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out), border-color 180ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 16px 32px -12px color-mix(in srgb, var(--glow, #14213d) 35%, transparent);
+  }
+}
+.card-hover:active {
+  transform: scale(0.98);
+  transition-duration: 100ms;
+}
+
+/* Generic press feedback for anything clickable that isn't a .btn-*. */
+.press {
+  transition: transform 140ms var(--ease-out);
+}
+.press:active {
+  transform: scale(0.94);
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.animate-float {
+  animation: float 4s var(--ease-in-out) infinite;
+}
+
+/* Scroll-reveal, driven by the v-reveal directive toggling .is-visible */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.6s var(--ease-out), transform 0.6s var(--ease-out);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Route transitions - exit is snappier than enter (system responds fast, content arrives considered). */
+.page-enter-active {
+  transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out);
+}
+.page-leave-active {
+  transition: opacity 120ms ease;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-leave-to {
+  opacity: 0;
+}
+
+/* Popovers/dropdowns: scale in from their trigger corner, never from center. */
+.popover-enter-active {
+  transition: transform 180ms var(--ease-out), opacity 150ms var(--ease-out);
+  transform-origin: top right;
+}
+.popover-leave-active {
+  transition: transform 120ms ease, opacity 120ms ease;
+  transform-origin: top right;
+}
+.popover-enter-from,
+.popover-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(-4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
