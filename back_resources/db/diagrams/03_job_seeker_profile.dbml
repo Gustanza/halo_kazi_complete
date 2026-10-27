@@ -1,0 +1,215 @@
+// HALOKAZI - Job seeker profile
+// Generated from db/halokazi.dbml - edit that file, not this one.
+// Grey tables belong to other modules (shown with their key only).
+
+Table job_seeker_profile [headercolor: #16A085] {
+  profile_id number [pk, increment]
+  user_id number [not null, unique, ref: - app_user.user_id]
+  contact_email varchar2(254)
+  alternate_phone varchar2(20)
+  region_id number [ref: > region.region_id]
+  district_id number [ref: > district.district_id]
+  address_line varchar2(300)
+  headline varchar2(150)
+  professional_summary clob
+  profile_picture_file_id number [ref: > stored_file.file_id]
+  expected_salary_min number(14,2)
+  receive_job_alerts bool [not null, default: 1]
+  completion_percentage number(5,2) [not null, default: 0, note: 'cached; live value = hk_profile_completion()']
+  completion_updated_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_section_na [headercolor: #16A085] {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  section_code varchar2(30) [pk, ref: > profile_section.section_code]
+  marked_at timestamptz [not null]
+  Note: 'Sections marked Not Applicable (only where can_be_na = 1)'
+}
+
+Table education [headercolor: #16A085] {
+  education_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  education_level_id number [not null, ref: > education_level.education_level_id]
+  institution_name varchar2(200) [not null]
+  qualification varchar2(200) [not null]
+  field_of_study varchar2(150)
+  grade varchar2(50)
+  start_date date
+  end_date date
+  is_current bool [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table work_experience [headercolor: #16A085] {
+  work_experience_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  company_name varchar2(200) [not null]
+  job_title varchar2(150) [not null]
+  employment_type_id number [ref: > employment_type.employment_type_id]
+  location varchar2(150)
+  description clob
+  start_date date [not null]
+  end_date date
+  is_current bool [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_skill [headercolor: #16A085] {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  skill_id number [pk, ref: > skill.skill_id]
+  proficiency varchar2(20) [not null, note: 'BEGINNER | INTERMEDIATE | ADVANCED | EXPERT']
+  years_experience number(4,1)
+  created_at timestamptz [not null]
+}
+
+Table certification [headercolor: #16A085] {
+  certification_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  certification_name varchar2(200) [not null]
+  issuing_organization varchar2(200) [not null]
+  credential_id varchar2(100)
+  issue_date date
+  expiry_date date
+  certificate_file_id number [ref: > stored_file.file_id]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: 'soft delete']
+}
+
+Table profile_language [headercolor: #16A085] {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  language_id number [pk, ref: > spoken_language.language_id]
+  proficiency varchar2(20) [not null, note: 'BASIC | CONVERSATIONAL | FLUENT | NATIVE']
+}
+
+Table profile_reference [headercolor: #16A085] {
+  reference_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  full_name varchar2(150) [not null]
+  job_title varchar2(150)
+  organization varchar2(200)
+  relationship varchar2(100)
+  email varchar2(254)
+  phone varchar2(20)
+  sort_order number [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_achievement [headercolor: #16A085] {
+  achievement_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  title varchar2(200) [not null]
+  description varchar2(2000)
+  achieved_on date
+  sort_order number [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_project [headercolor: #16A085] {
+  project_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  title varchar2(200) [not null]
+  role varchar2(150)
+  description varchar2(4000)
+  project_url varchar2(500)
+  start_date date
+  end_date date
+  sort_order number [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_interest [headercolor: #16A085] {
+  interest_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  name varchar2(100) [not null]
+  sort_order number [not null, default: 0]
+}
+
+Table profile_preferred_category [headercolor: #16A085] {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  category_id number [pk, ref: > job_category.category_id]
+}
+
+Table profile_preferred_region [headercolor: #16A085] {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  region_id number [pk, ref: > region.region_id]
+}
+
+Table profile_preferred_emp_type [headercolor: #16A085] {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  employment_type_id number [pk, ref: > employment_type.employment_type_id]
+}
+
+Table app_user [headercolor: #BDC3C7] {
+  user_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+Table district [headercolor: #BDC3C7] {
+  district_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table education_level [headercolor: #BDC3C7] {
+  education_level_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table employment_type [headercolor: #BDC3C7] {
+  employment_type_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table job_category [headercolor: #BDC3C7] {
+  category_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table profile_section [headercolor: #BDC3C7] {
+  section_code varchar2(30) [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table region [headercolor: #BDC3C7] {
+  region_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table skill [headercolor: #BDC3C7] {
+  skill_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table spoken_language [headercolor: #BDC3C7] {
+  language_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table stored_file [headercolor: #BDC3C7] {
+  file_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+TableGroup job_seeker_profile_group [color: #16A085] {
+  job_seeker_profile
+  profile_section_na
+  education
+  work_experience
+  profile_skill
+  certification
+  profile_language
+  profile_reference
+  profile_achievement
+  profile_project
+  profile_interest
+  profile_preferred_category
+  profile_preferred_region
+  profile_preferred_emp_type
+}

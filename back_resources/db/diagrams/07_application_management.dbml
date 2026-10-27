@@ -1,0 +1,85 @@
+// HALOKAZI - Application management
+// Generated from db/halokazi.dbml - edit that file, not this one.
+// Grey tables belong to other modules (shown with their key only).
+
+Table application [headercolor: #C0392B] {
+  application_id number [pk, increment]
+  application_ref varchar2(20) [not null, unique, note: 'HK-2026-000123']
+  vacancy_id number [not null, ref: > vacancy.vacancy_id]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  cv_id number [not null, ref: > cv.cv_id, note: 'cannot change after submit']
+  cover_letter clob [not null]
+  requirements_confirmed bool [not null, note: 'must be 1']
+  requirements_confirmed_at timestamptz [not null]
+  profile_snapshot json [not null, note: 'frozen profile at submission']
+  cv_snapshot json [not null, note: 'frozen CV data at submission']
+  cv_snapshot_file_id number [not null, ref: > stored_file.file_id, note: 'frozen CV PDF']
+  profile_completion_at_submit number(5,2) [not null]
+  status varchar2(20) [not null, note: 'SUBMITTED -> IN_REVIEW -> REJECTED | SHORTLISTED']
+  status_changed_by number [ref: > app_user.user_id]
+  status_changed_at timestamptz [not null]
+  status_remarks varchar2(1000)
+  submitted_at timestamptz [not null]
+  last_edited_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  Note: 'One non-REJECTED application per profile+vacancy; no withdrawal; editable only while SUBMITTED and before deadline'
+}
+
+Table application_certificate [headercolor: #C0392B] {
+  application_id number [pk, ref: > application.application_id]
+  certification_id number [pk, ref: > certification.certification_id]
+  certification_name varchar2(200) [not null, note: 'frozen copy']
+  issuing_organization varchar2(200) [not null]
+  issue_date date
+  expiry_date date
+  certificate_file_id number [ref: > stored_file.file_id]
+  attached_at timestamptz [not null]
+}
+
+Table application_status_history [headercolor: #C0392B] {
+  history_id number [pk, increment]
+  application_id number [not null, ref: > application.application_id]
+  from_status varchar2(20)
+  to_status varchar2(20) [not null]
+  changed_by number [ref: > app_user.user_id]
+  changed_at timestamptz [not null]
+  remarks varchar2(1000)
+  Note: 'Immutable, written by trigger'
+}
+
+Table app_user [headercolor: #BDC3C7] {
+  user_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+Table certification [headercolor: #BDC3C7] {
+  certification_id number [pk]
+  Note: 'Other module - see job_seeker_profile_group'
+}
+
+Table cv [headercolor: #BDC3C7] {
+  cv_id number [pk]
+  Note: 'Other module - see cv_management'
+}
+
+Table job_seeker_profile [headercolor: #BDC3C7] {
+  profile_id number [pk]
+  Note: 'Other module - see job_seeker_profile_group'
+}
+
+Table stored_file [headercolor: #BDC3C7] {
+  file_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+Table vacancy [headercolor: #BDC3C7] {
+  vacancy_id number [pk]
+  Note: 'Other module - see vacancy_management'
+}
+
+TableGroup application_management [color: #C0392B] {
+  application
+  application_certificate
+  application_status_history
+}

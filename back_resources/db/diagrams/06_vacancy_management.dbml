@@ -1,0 +1,126 @@
+// HALOKAZI - Vacancy management
+// Generated from db/halokazi.dbml - edit that file, not this one.
+// Grey tables belong to other modules (shown with their key only).
+
+Table vacancy [headercolor: #2471A3] {
+  vacancy_id number [pk, increment]
+  employer_id number [not null, ref: > employer.employer_id]
+  job_title varchar2(200) [not null]
+  job_description clob [not null]
+  job_requirements clob [not null]
+  qualifications clob [not null]
+  min_education_level_id number [ref: > education_level.education_level_id]
+  work_experience varchar2(500) [not null]
+  min_experience_years number(4,1) [not null, default: 0]
+  region_id number [not null, ref: > region.region_id]
+  district_id number [ref: > district.district_id]
+  location_details varchar2(300)
+  employment_type_id number [not null, ref: > employment_type.employment_type_id]
+  number_of_positions number [not null, note: '> 0']
+  application_deadline timestamptz [not null, note: 'must be in the future']
+  category_id number [ref: > job_category.category_id, note: 'optional']
+  salary_min number(14,2) [note: 'optional']
+  salary_max number(14,2) [note: 'optional']
+  salary_currency varchar2(3) [not null, default: 'TZS']
+  salary_period varchar2(10)
+  status varchar2(20) [not null, note: 'DRAFT | ACTIVE | CLOSED | EXPIRED | DELETED']
+  closure_reason varchar2(30) [note: 'DEADLINE_REACHED | MANUAL | ADMIN_ACTION']
+  status_changed_by number [ref: > app_user.user_id]
+  draft_expires_at timestamptz [note: 'created + 14 days']
+  published_at timestamptz
+  closed_at timestamptz
+  created_by number [not null, ref: > app_user.user_id]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz
+}
+
+Table vacancy_skill [headercolor: #2471A3] {
+  vacancy_id number [pk, ref: > vacancy.vacancy_id]
+  skill_id number [pk, ref: > skill.skill_id]
+  is_mandatory bool [not null, default: 1]
+}
+
+Table vacancy_status_history [headercolor: #2471A3] {
+  history_id number [pk, increment]
+  vacancy_id number [not null, ref: > vacancy.vacancy_id]
+  from_status varchar2(20)
+  to_status varchar2(20) [not null]
+  reason varchar2(30)
+  changed_by number [ref: > app_user.user_id, note: 'NULL = system job']
+  changed_at timestamptz [not null]
+  Note: 'Append-only, written by trigger'
+}
+
+Table vacancy_reopen_request [headercolor: #2471A3] {
+  request_id number [pk, increment]
+  vacancy_id number [not null, ref: > vacancy.vacancy_id]
+  requested_by number [not null, ref: > app_user.user_id]
+  reason varchar2(1000) [not null]
+  new_deadline timestamptz [not null]
+  status varchar2(20) [not null, note: 'PENDING | APPROVED | REJECTED | CANCELLED']
+  requested_at timestamptz [not null]
+  reviewed_by number [ref: > app_user.user_id]
+  reviewed_at timestamptz
+  review_notes varchar2(1000)
+  Note: 'One PENDING per vacancy; CLOSED -> ACTIVE only with an APPROVED request'
+}
+
+Table saved_vacancy [headercolor: #2471A3] {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  vacancy_id number [pk, ref: > vacancy.vacancy_id]
+  saved_at timestamptz [not null]
+}
+
+Table app_user [headercolor: #BDC3C7] {
+  user_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+Table district [headercolor: #BDC3C7] {
+  district_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table education_level [headercolor: #BDC3C7] {
+  education_level_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table employer [headercolor: #BDC3C7] {
+  employer_id number [pk]
+  Note: 'Other module - see employer_management'
+}
+
+Table employment_type [headercolor: #BDC3C7] {
+  employment_type_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table job_category [headercolor: #BDC3C7] {
+  category_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table job_seeker_profile [headercolor: #BDC3C7] {
+  profile_id number [pk]
+  Note: 'Other module - see job_seeker_profile_group'
+}
+
+Table region [headercolor: #BDC3C7] {
+  region_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table skill [headercolor: #BDC3C7] {
+  skill_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+TableGroup vacancy_management [color: #2471A3] {
+  vacancy
+  vacancy_skill
+  vacancy_status_history
+  vacancy_reopen_request
+  saved_vacancy
+}

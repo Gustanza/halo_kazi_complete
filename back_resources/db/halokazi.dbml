@@ -1,0 +1,817 @@
+// HALOKAZI - database design (DBML for dbdiagram.io)
+// Source of truth is db/oracle/01_schema.sql (Oracle 19c). This file is for the diagram.
+// Type notes: bool = NUMBER(1) 0/1, json = CLOB with IS JSON check, timestamptz = TIMESTAMP WITH TIME ZONE
+
+Project halokazi {
+  database_type: 'Oracle'
+  Note: 'Halokazi - Web-Based CV Builder, Career & Job Opportunity Platform (Halotel)'
+}
+
+//////////////////////////////////////////////////////////////////////
+// REFERENCE DATA
+//////////////////////////////////////////////////////////////////////
+
+Table region {
+  region_id number [pk, increment]
+  code varchar2(30) [not null, unique]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  zone varchar2(20) [not null, default: 'MAINLAND', note: 'MAINLAND | ZANZIBAR']
+  is_active bool [not null, default: 1]
+}
+
+Table district {
+  district_id number [pk, increment]
+  region_id number [not null, ref: > region.region_id]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  is_active bool [not null, default: 1]
+  indexes {
+    (region_id, name_en) [unique]
+  }
+}
+
+Table job_category {
+  category_id number [pk, increment]
+  code varchar2(40) [not null, unique]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  sort_order number [not null, default: 0]
+  is_active bool [not null, default: 1]
+}
+
+Table employment_type {
+  employment_type_id number [pk, increment]
+  code varchar2(30) [not null, unique]
+  name_en varchar2(60) [not null]
+  name_sw varchar2(60) [not null]
+  sort_order number [not null, default: 0]
+  is_active bool [not null, default: 1]
+}
+
+Table education_level {
+  education_level_id number [pk, increment]
+  code varchar2(30) [not null, unique]
+  name_en varchar2(80) [not null]
+  name_sw varchar2(80) [not null]
+  sort_order number [not null, note: 'ordered for minimum-education matching']
+  is_active bool [not null, default: 1]
+}
+
+Table skill {
+  skill_id number [pk, increment]
+  name_en varchar2(100) [not null, note: 'unique, case-insensitive']
+  name_sw varchar2(100)
+  category_id number [ref: > job_category.category_id]
+  is_active bool [not null, default: 1]
+  created_at timestamptz [not null]
+}
+
+Table spoken_language {
+  language_id number [pk, increment]
+  iso_code varchar2(10) [not null, unique]
+  name_en varchar2(60) [not null]
+  name_sw varchar2(60) [not null]
+  is_active bool [not null, default: 1]
+}
+
+Table report_reason {
+  reason_id number [pk, increment]
+  code varchar2(40) [not null, unique]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  applies_to varchar2(20) [not null, default: 'ALL']
+  is_active bool [not null, default: 1]
+}
+
+Table profile_section {
+  section_code varchar2(30) [pk, note: 'CONTACT, EDUCATION, WORK_EXPERIENCE, SKILLS, CERTIFICATIONS, LANGUAGES, ADDRESS, SUMMARY, PROFILE_PICTURE']
+  name_en varchar2(80) [not null]
+  name_sw varchar2(80) [not null]
+  weight number(5,2) [not null, note: 'completion weight %, total 100']
+  can_be_na bool [not null, default: 0]
+  sort_order number [not null]
+  is_active bool [not null, default: 1]
+}
+
+Table system_setting {
+  setting_key varchar2(60) [pk]
+  setting_value varchar2(400) [not null]
+  value_type varchar2(10) [not null]
+  description varchar2(400)
+  updated_by number [ref: > app_user.user_id]
+  updated_at timestamptz [not null]
+  Note: 'PROFILE_MIN_COMPLETION=75, OTP_TTL_SECONDS=120, OTP_MAX_RESENDS=3, SESSION_IDLE_TIMEOUT_MINUTES=10, DRAFT_VACANCY_EXPIRY_DAYS=14 ...'
+}
+
+//////////////////////////////////////////////////////////////////////
+// USERS, ACCESS & SECURITY
+//////////////////////////////////////////////////////////////////////
+
+Table app_user {
+  user_id number [pk, increment]
+  full_name varchar2(150) [not null]
+  email varchar2(254) [not null, note: 'unique, case-insensitive']
+  phone varchar2(20) [not null, unique]
+  password_hash varchar2(255) [not null]
+  role varchar2(20) [not null, note: 'JOB_SEEKER | EMPLOYER | ADMIN | SUPER_ADMIN']
+  account_status varchar2(30) [not null, note: 'PENDING_VERIFICATION | ACTIVE | SUSPENDED | DEACTIVATED | DELETED']
+  phone_verified bool [not null, default: 0]
+  phone_verified_at timestamptz
+  preferred_language varchar2(2) [not null, default: 'EN', note: 'EN | SW']
+  failed_login_count number [not null, default: 0]
+  locked_until timestamptz
+  last_login_at timestamptz
+  password_changed_at timestamptz
+  suspended_at timestamptz
+  suspended_by number [ref: > app_user.user_id]
+  suspension_reason varchar2(500)
+  created_by number [ref: > app_user.user_id, note: 'required for ADMIN (Super Admin creator)']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: 'soft delete']
+  anonymized_at timestamptz
+}
+
+Table stored_file {
+  file_id number [pk, increment]
+  owner_user_id number [ref: > app_user.user_id]
+  file_category varchar2(40) [not null, note: 'PROFILE_PICTURE, CERTIFICATE, VERIFICATION_DOCUMENT, COMPANY_LOGO, CV_PDF, APPLICATION_CV_PDF, CV_TEMPLATE_PREVIEW, REPORT_EXPORT']
+  storage_provider varchar2(30) [not null]
+  storage_key varchar2(500) [not null, unique]
+  original_filename varchar2(255)
+  mime_type varchar2(100) [not null]
+  size_bytes number [not null]
+  checksum_sha256 varchar2(64)
+  scan_status varchar2(20) [not null, default: 'PENDING', note: 'PENDING | CLEAN | INFECTED | FAILED | NOT_REQUIRED']
+  scanned_at timestamptz
+  created_at timestamptz [not null]
+  deleted_at timestamptz
+}
+
+Table admin_permission {
+  permission_id number [pk, increment]
+  code varchar2(60) [not null, unique]
+  module varchar2(40) [not null]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  description varchar2(400)
+  created_at timestamptz [not null]
+}
+
+Table admin_permission_assignment {
+  assignment_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id, note: 'must be ADMIN']
+  permission_id number [not null, ref: > admin_permission.permission_id]
+  assigned_by number [not null, ref: > app_user.user_id, note: 'must be SUPER_ADMIN, never self']
+  assigned_at timestamptz [not null]
+  revoked_by number [ref: > app_user.user_id]
+  revoked_at timestamptz
+  Note: 'One active (revoked_at IS NULL) row per user+permission; revoked rows kept as history'
+}
+
+Table policy_document {
+  policy_id number [pk, increment]
+  policy_type varchar2(30) [not null, note: 'TERMS | PRIVACY | DATA_CONSENT']
+  version varchar2(20) [not null]
+  title_en varchar2(200) [not null]
+  title_sw varchar2(200) [not null]
+  content_en clob [not null]
+  content_sw clob [not null]
+  effective_from timestamptz [not null]
+  is_current bool [not null, default: 0, note: 'one current per policy_type']
+  created_by number [ref: > app_user.user_id]
+  created_at timestamptz [not null]
+  indexes {
+    (policy_type, version) [unique]
+  }
+}
+
+Table policy_acceptance {
+  acceptance_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  policy_id number [not null, ref: > policy_document.policy_id]
+  accepted_at timestamptz [not null]
+  ip_address varchar2(45)
+  user_agent varchar2(400)
+  indexes {
+    (user_id, policy_id) [unique]
+  }
+}
+
+Table otp_code {
+  otp_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  phone varchar2(20) [not null]
+  purpose varchar2(30) [not null, note: 'PHONE_VERIFICATION | PASSWORD_RESET | PHONE_CHANGE']
+  code_hash varchar2(255) [not null]
+  expires_at timestamptz [not null, note: '+2 minutes']
+  resend_count number [not null, default: 0, note: 'max 3']
+  attempt_count number [not null, default: 0]
+  consumed_at timestamptz
+  ip_address varchar2(45)
+  created_at timestamptz [not null]
+}
+
+Table password_reset_token {
+  token_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  token_hash varchar2(255) [not null, unique]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  ip_address varchar2(45)
+  created_at timestamptz [not null]
+}
+
+Table user_session {
+  session_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  token_hash varchar2(255) [not null, unique]
+  ip_address varchar2(45)
+  user_agent varchar2(400)
+  created_at timestamptz [not null]
+  last_activity_at timestamptz [not null, note: '10 min idle timeout']
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+  revoke_reason varchar2(30)
+}
+
+Table login_attempt {
+  attempt_id number [pk, increment]
+  identifier varchar2(254) [not null]
+  user_id number [ref: > app_user.user_id]
+  ip_address varchar2(45)
+  succeeded bool [not null]
+  failure_reason varchar2(40)
+  attempted_at timestamptz [not null]
+}
+
+Table sms_log {
+  sms_id number [pk, increment]
+  user_id number [ref: > app_user.user_id]
+  phone varchar2(20) [not null]
+  purpose varchar2(30) [not null]
+  provider_message_id varchar2(100)
+  delivery_status varchar2(20) [not null, note: 'QUEUED | SENT | DELIVERED | FAILED']
+  error_message varchar2(500)
+  created_at timestamptz [not null]
+  sent_at timestamptz
+  delivered_at timestamptz
+}
+
+Table account_deletion_request {
+  request_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  reason varchar2(1000)
+  status varchar2(20) [not null, note: 'REQUESTED | COMPLETED | REJECTED | CANCELLED']
+  requested_at timestamptz [not null]
+  processed_by number [ref: > app_user.user_id]
+  processed_at timestamptz
+  notes varchar2(1000)
+}
+
+Table audit_log {
+  audit_id number [pk, increment]
+  user_id number [ref: > app_user.user_id, note: 'NULL = system']
+  actor_role varchar2(20)
+  action varchar2(60) [not null]
+  entity_type varchar2(40)
+  entity_id number
+  result varchar2(10) [not null, note: 'SUCCESS | FAILURE | DENIED']
+  ip_address varchar2(45)
+  user_agent varchar2(400)
+  details json
+  created_at timestamptz [not null]
+  Note: 'Append-only (trigger blocks UPDATE/DELETE)'
+}
+
+//////////////////////////////////////////////////////////////////////
+// JOB SEEKER PROFILE
+//////////////////////////////////////////////////////////////////////
+
+Table job_seeker_profile {
+  profile_id number [pk, increment]
+  user_id number [not null, unique, ref: - app_user.user_id]
+  contact_email varchar2(254)
+  alternate_phone varchar2(20)
+  region_id number [ref: > region.region_id]
+  district_id number [ref: > district.district_id]
+  address_line varchar2(300)
+  headline varchar2(150)
+  professional_summary clob
+  profile_picture_file_id number [ref: > stored_file.file_id]
+  expected_salary_min number(14,2)
+  receive_job_alerts bool [not null, default: 1]
+  completion_percentage number(5,2) [not null, default: 0, note: 'cached; live value = hk_profile_completion()']
+  completion_updated_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_section_na {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  section_code varchar2(30) [pk, ref: > profile_section.section_code]
+  marked_at timestamptz [not null]
+  Note: 'Sections marked Not Applicable (only where can_be_na = 1)'
+}
+
+Table education {
+  education_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  education_level_id number [not null, ref: > education_level.education_level_id]
+  institution_name varchar2(200) [not null]
+  qualification varchar2(200) [not null]
+  field_of_study varchar2(150)
+  grade varchar2(50)
+  start_date date
+  end_date date
+  is_current bool [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table work_experience {
+  work_experience_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  company_name varchar2(200) [not null]
+  job_title varchar2(150) [not null]
+  employment_type_id number [ref: > employment_type.employment_type_id]
+  location varchar2(150)
+  description clob
+  start_date date [not null]
+  end_date date
+  is_current bool [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_skill {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  skill_id number [pk, ref: > skill.skill_id]
+  proficiency varchar2(20) [not null, note: 'BEGINNER | INTERMEDIATE | ADVANCED | EXPERT']
+  years_experience number(4,1)
+  created_at timestamptz [not null]
+}
+
+Table certification {
+  certification_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  certification_name varchar2(200) [not null]
+  issuing_organization varchar2(200) [not null]
+  credential_id varchar2(100)
+  issue_date date
+  expiry_date date
+  certificate_file_id number [ref: > stored_file.file_id]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: 'soft delete']
+}
+
+Table profile_language {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  language_id number [pk, ref: > spoken_language.language_id]
+  proficiency varchar2(20) [not null, note: 'BASIC | CONVERSATIONAL | FLUENT | NATIVE']
+}
+
+Table profile_reference {
+  reference_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  full_name varchar2(150) [not null]
+  job_title varchar2(150)
+  organization varchar2(200)
+  relationship varchar2(100)
+  email varchar2(254)
+  phone varchar2(20)
+  sort_order number [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_achievement {
+  achievement_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  title varchar2(200) [not null]
+  description varchar2(2000)
+  achieved_on date
+  sort_order number [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_project {
+  project_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  title varchar2(200) [not null]
+  role varchar2(150)
+  description varchar2(4000)
+  project_url varchar2(500)
+  start_date date
+  end_date date
+  sort_order number [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table profile_interest {
+  interest_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  name varchar2(100) [not null]
+  sort_order number [not null, default: 0]
+}
+
+Table profile_preferred_category {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  category_id number [pk, ref: > job_category.category_id]
+}
+
+Table profile_preferred_region {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  region_id number [pk, ref: > region.region_id]
+}
+
+Table profile_preferred_emp_type {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  employment_type_id number [pk, ref: > employment_type.employment_type_id]
+}
+
+//////////////////////////////////////////////////////////////////////
+// CV MANAGEMENT
+//////////////////////////////////////////////////////////////////////
+
+Table cv_template {
+  template_id number [pk, increment]
+  code varchar2(40) [not null, unique]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  description_en varchar2(500)
+  description_sw varchar2(500)
+  layout_definition clob
+  preview_file_id number [ref: > stored_file.file_id]
+  version number [not null, default: 1]
+  status varchar2(10) [not null, note: 'ACTIVE | INACTIVE']
+  sort_order number [not null, default: 0]
+  created_by number [ref: > app_user.user_id]
+  created_at timestamptz [not null]
+  updated_by number [ref: > app_user.user_id]
+  updated_at timestamptz [not null]
+}
+
+Table cv {
+  cv_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  template_id number [not null, ref: > cv_template.template_id]
+  cv_name varchar2(100) [not null]
+  headline varchar2(150)
+  summary_override clob
+  cv_language varchar2(2) [not null, default: 'EN']
+  latest_pdf_file_id number [ref: > stored_file.file_id]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: 'soft delete - applications keep their snapshot']
+}
+
+Table cv_section {
+  cv_id number [pk, ref: > cv.cv_id]
+  section_code varchar2(30) [pk, note: 'CONTACT, SUMMARY, WORK_EXPERIENCE, EDUCATION, SKILLS, CERTIFICATIONS, LANGUAGES, PROJECTS, ACHIEVEMENTS, REFERENCES, INTERESTS']
+  is_visible bool [not null, default: 1]
+  display_order number [not null]
+  custom_title varchar2(100)
+}
+
+//////////////////////////////////////////////////////////////////////
+// EMPLOYER
+//////////////////////////////////////////////////////////////////////
+
+Table employer {
+  employer_id number [pk, increment]
+  user_id number [not null, unique, ref: - app_user.user_id]
+  business_name varchar2(200) [not null, note: 'locked after approval']
+  registration_number varchar2(60) [unique, note: 'locked after approval']
+  tin varchar2(20) [unique, note: 'one account per company; locked after approval']
+  business_licence_number varchar2(60) [note: 'locked after approval']
+  verification_status varchar2(20) [not null, note: 'NOT_SUBMITTED | PENDING_REVIEW | APPROVED | REJECTED']
+  approved_at timestamptz
+  representative_name varchar2(150)
+  representative_title varchar2(100)
+  representative_phone varchar2(20)
+  representative_email varchar2(254)
+  category_id number [ref: > job_category.category_id]
+  company_description clob
+  website varchar2(300)
+  company_email varchar2(254)
+  company_phone varchar2(20)
+  region_id number [ref: > region.region_id]
+  district_id number [ref: > district.district_id]
+  physical_address varchar2(300)
+  company_size varchar2(20)
+  logo_file_id number [ref: > stored_file.file_id]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz
+  anonymized_at timestamptz
+}
+
+Table employer_verification {
+  verification_id number [pk, increment]
+  employer_id number [not null, ref: > employer.employer_id]
+  submission_no number [not null]
+  business_name varchar2(200) [not null]
+  registration_number varchar2(60) [not null]
+  tin varchar2(20) [not null]
+  business_licence_number varchar2(60) [not null]
+  representative_name varchar2(150) [not null]
+  representative_title varchar2(100)
+  representative_phone varchar2(20) [not null]
+  representative_email varchar2(254) [not null]
+  status varchar2(20) [not null, note: 'PENDING_REVIEW | APPROVED | REJECTED (final once decided)']
+  submitted_by number [not null, ref: > app_user.user_id]
+  submitted_at timestamptz [not null]
+  reviewed_by number [ref: > app_user.user_id]
+  reviewed_at timestamptz
+  decision_notes varchar2(2000)
+  indexes {
+    (employer_id, submission_no) [unique]
+  }
+  Note: 'Full submission history; one PENDING_REVIEW per employer'
+}
+
+Table employer_verification_doc {
+  document_id number [pk, increment]
+  verification_id number [not null, ref: > employer_verification.verification_id]
+  document_type varchar2(40) [not null, note: 'CERTIFICATE_OF_INCORPORATION | TIN_CERTIFICATE | BUSINESS_LICENCE | REPRESENTATIVE_ID | OTHER']
+  file_id number [not null, ref: > stored_file.file_id]
+  uploaded_at timestamptz [not null]
+  indexes {
+    (verification_id, document_type) [unique]
+  }
+}
+
+//////////////////////////////////////////////////////////////////////
+// VACANCY
+//////////////////////////////////////////////////////////////////////
+
+Table vacancy {
+  vacancy_id number [pk, increment]
+  employer_id number [not null, ref: > employer.employer_id]
+  job_title varchar2(200) [not null]
+  job_description clob [not null]
+  job_requirements clob [not null]
+  qualifications clob [not null]
+  min_education_level_id number [ref: > education_level.education_level_id]
+  work_experience varchar2(500) [not null]
+  min_experience_years number(4,1) [not null, default: 0]
+  region_id number [not null, ref: > region.region_id]
+  district_id number [ref: > district.district_id]
+  location_details varchar2(300)
+  employment_type_id number [not null, ref: > employment_type.employment_type_id]
+  number_of_positions number [not null, note: '> 0']
+  application_deadline timestamptz [not null, note: 'must be in the future']
+  category_id number [ref: > job_category.category_id, note: 'optional']
+  salary_min number(14,2) [note: 'optional']
+  salary_max number(14,2) [note: 'optional']
+  salary_currency varchar2(3) [not null, default: 'TZS']
+  salary_period varchar2(10)
+  status varchar2(20) [not null, note: 'DRAFT | ACTIVE | CLOSED | EXPIRED | DELETED']
+  closure_reason varchar2(30) [note: 'DEADLINE_REACHED | MANUAL | ADMIN_ACTION']
+  status_changed_by number [ref: > app_user.user_id]
+  draft_expires_at timestamptz [note: 'created + 14 days']
+  published_at timestamptz
+  closed_at timestamptz
+  created_by number [not null, ref: > app_user.user_id]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz
+}
+
+Table vacancy_skill {
+  vacancy_id number [pk, ref: > vacancy.vacancy_id]
+  skill_id number [pk, ref: > skill.skill_id]
+  is_mandatory bool [not null, default: 1]
+}
+
+Table vacancy_status_history {
+  history_id number [pk, increment]
+  vacancy_id number [not null, ref: > vacancy.vacancy_id]
+  from_status varchar2(20)
+  to_status varchar2(20) [not null]
+  reason varchar2(30)
+  changed_by number [ref: > app_user.user_id, note: 'NULL = system job']
+  changed_at timestamptz [not null]
+  Note: 'Append-only, written by trigger'
+}
+
+Table vacancy_reopen_request {
+  request_id number [pk, increment]
+  vacancy_id number [not null, ref: > vacancy.vacancy_id]
+  requested_by number [not null, ref: > app_user.user_id]
+  reason varchar2(1000) [not null]
+  new_deadline timestamptz [not null]
+  status varchar2(20) [not null, note: 'PENDING | APPROVED | REJECTED | CANCELLED']
+  requested_at timestamptz [not null]
+  reviewed_by number [ref: > app_user.user_id]
+  reviewed_at timestamptz
+  review_notes varchar2(1000)
+  Note: 'One PENDING per vacancy; CLOSED -> ACTIVE only with an APPROVED request'
+}
+
+Table saved_vacancy {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  vacancy_id number [pk, ref: > vacancy.vacancy_id]
+  saved_at timestamptz [not null]
+}
+
+//////////////////////////////////////////////////////////////////////
+// APPLICATION
+//////////////////////////////////////////////////////////////////////
+
+Table application {
+  application_id number [pk, increment]
+  application_ref varchar2(20) [not null, unique, note: 'HK-2026-000123']
+  vacancy_id number [not null, ref: > vacancy.vacancy_id]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  cv_id number [not null, ref: > cv.cv_id, note: 'cannot change after submit']
+  cover_letter clob [not null]
+  requirements_confirmed bool [not null, note: 'must be 1']
+  requirements_confirmed_at timestamptz [not null]
+  profile_snapshot json [not null, note: 'frozen profile at submission']
+  cv_snapshot json [not null, note: 'frozen CV data at submission']
+  cv_snapshot_file_id number [not null, ref: > stored_file.file_id, note: 'frozen CV PDF']
+  profile_completion_at_submit number(5,2) [not null]
+  status varchar2(20) [not null, note: 'SUBMITTED -> IN_REVIEW -> REJECTED | SHORTLISTED']
+  status_changed_by number [ref: > app_user.user_id]
+  status_changed_at timestamptz [not null]
+  status_remarks varchar2(1000)
+  submitted_at timestamptz [not null]
+  last_edited_at timestamptz
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  Note: 'One non-REJECTED application per profile+vacancy; no withdrawal; editable only while SUBMITTED and before deadline'
+}
+
+Table application_certificate {
+  application_id number [pk, ref: > application.application_id]
+  certification_id number [pk, ref: > certification.certification_id]
+  certification_name varchar2(200) [not null, note: 'frozen copy']
+  issuing_organization varchar2(200) [not null]
+  issue_date date
+  expiry_date date
+  certificate_file_id number [ref: > stored_file.file_id]
+  attached_at timestamptz [not null]
+}
+
+Table application_status_history {
+  history_id number [pk, increment]
+  application_id number [not null, ref: > application.application_id]
+  from_status varchar2(20)
+  to_status varchar2(20) [not null]
+  changed_by number [ref: > app_user.user_id]
+  changed_at timestamptz [not null]
+  remarks varchar2(1000)
+  Note: 'Immutable, written by trigger'
+}
+
+//////////////////////////////////////////////////////////////////////
+// NOTIFICATIONS, MODERATION, REPORTING
+//////////////////////////////////////////////////////////////////////
+
+Table notification_template {
+  template_code varchar2(50) [pk]
+  channel varchar2(10) [not null, note: 'IN_APP | SMS | EMAIL']
+  title_en varchar2(200) [not null]
+  title_sw varchar2(200) [not null]
+  body_en varchar2(2000) [not null]
+  body_sw varchar2(2000) [not null]
+  is_active bool [not null, default: 1]
+  updated_at timestamptz [not null]
+}
+
+Table notification {
+  notification_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  template_code varchar2(50) [ref: > notification_template.template_code]
+  title varchar2(200) [not null]
+  message varchar2(2000) [not null]
+  related_entity_type varchar2(30)
+  related_entity_id number
+  is_read bool [not null, default: 0]
+  read_at timestamptz
+  created_at timestamptz [not null]
+}
+
+Table user_report {
+  report_id number [pk, increment]
+  reporter_user_id number [not null, ref: > app_user.user_id]
+  target_type varchar2(20) [not null, note: 'EMPLOYER | VACANCY | JOB_SEEKER']
+  target_employer_id number [ref: > employer.employer_id]
+  target_vacancy_id number [ref: > vacancy.vacancy_id]
+  target_user_id number [ref: > app_user.user_id]
+  reason_id number [not null, ref: > report_reason.reason_id]
+  description varchar2(2000)
+  status varchar2(20) [not null, note: 'OPEN | UNDER_INVESTIGATION | RESOLVED | REJECTED']
+  assigned_to number [ref: > app_user.user_id]
+  resolved_by number [ref: > app_user.user_id]
+  resolved_at timestamptz
+  resolution_action varchar2(30)
+  resolution_notes varchar2(2000)
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  Note: 'Exactly one explicit target column is filled, matching target_type'
+}
+
+Table report_export {
+  export_id number [pk, increment]
+  requested_by number [not null, ref: > app_user.user_id]
+  report_type varchar2(40) [not null]
+  date_from date
+  date_to date
+  parameters json
+  export_format varchar2(5) [not null, note: 'XLSX | PDF']
+  status varchar2(20) [not null]
+  file_id number [ref: > stored_file.file_id]
+  error_message varchar2(1000)
+  requested_at timestamptz [not null]
+  completed_at timestamptz
+}
+
+//////////////////////////////////////////////////////////////////////
+// GROUPS (colour blocks in dbdiagram)
+//////////////////////////////////////////////////////////////////////
+
+TableGroup reference_data {
+  region
+  district
+  job_category
+  employment_type
+  education_level
+  skill
+  spoken_language
+  report_reason
+  profile_section
+  system_setting
+}
+
+TableGroup users_access_security {
+  app_user
+  stored_file
+  admin_permission
+  admin_permission_assignment
+  policy_document
+  policy_acceptance
+  otp_code
+  password_reset_token
+  user_session
+  login_attempt
+  sms_log
+  account_deletion_request
+  audit_log
+}
+
+TableGroup job_seeker_profile_group {
+  job_seeker_profile
+  profile_section_na
+  education
+  work_experience
+  profile_skill
+  certification
+  profile_language
+  profile_reference
+  profile_achievement
+  profile_project
+  profile_interest
+  profile_preferred_category
+  profile_preferred_region
+  profile_preferred_emp_type
+}
+
+TableGroup cv_management {
+  cv_template
+  cv
+  cv_section
+}
+
+TableGroup employer_management {
+  employer
+  employer_verification
+  employer_verification_doc
+}
+
+TableGroup vacancy_management {
+  vacancy
+  vacancy_skill
+  vacancy_status_history
+  vacancy_reopen_request
+  saved_vacancy
+}
+
+TableGroup application_management {
+  application
+  application_certificate
+  application_status_history
+}
+
+TableGroup notifications_moderation_reports {
+  notification_template
+  notification
+  user_report
+  report_export
+}
