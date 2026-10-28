@@ -1,0 +1,43 @@
+--------------------------------------------------------------------------------
+-- HALOKAZI - drop every schema object (DEV/TEST ONLY - destroys all data)
+--------------------------------------------------------------------------------
+BEGIN
+    DBMS_SCHEDULER.DROP_JOB('HK_LIFECYCLE_JOB', force => TRUE);
+EXCEPTION WHEN OTHERS THEN NULL;
+END;
+/
+
+BEGIN
+    FOR v IN (SELECT view_name FROM user_views
+               WHERE view_name IN ('V_OPEN_VACANCY', 'V_ADMIN_EFFECTIVE_PERMISSION',
+                                   'V_EMPLOYER_VACANCY_STATS', 'V_JOB_SEEKER_APPLICATION_STATS',
+                                   'V_VACANCY_PROFILE_MATCH')) LOOP
+        EXECUTE IMMEDIATE 'DROP VIEW ' || v.view_name;
+    END LOOP;
+
+    FOR t IN (SELECT table_name FROM user_tables WHERE table_name IN (
+        'REPORT_EXPORT', 'USER_REPORT', 'NOTIFICATION', 'NOTIFICATION_TEMPLATE',
+        'APPLICATION_STATUS_HISTORY', 'APPLICATION_CERTIFICATE', 'APPLICATION',
+        'SAVED_VACANCY', 'VACANCY_REOPEN_REQUEST', 'VACANCY_STATUS_HISTORY', 'VACANCY_SKILL', 'VACANCY',
+        'EMPLOYER_VERIFICATION_DOC', 'EMPLOYER_VERIFICATION', 'EMPLOYER',
+        'CV_SECTION', 'CV', 'CV_TEMPLATE',
+        'PROFILE_PREFERRED_EMP_TYPE', 'PROFILE_PREFERRED_REGION', 'PROFILE_PREFERRED_CATEGORY',
+        'PROFILE_INTEREST', 'PROFILE_PROJECT', 'PROFILE_ACHIEVEMENT', 'PROFILE_REFERENCE',
+        'PROFILE_LANGUAGE', 'CERTIFICATION', 'PROFILE_SKILL', 'WORK_EXPERIENCE', 'EDUCATION',
+        'PROFILE_SECTION_NA', 'JOB_SEEKER_PROFILE',
+        'AUDIT_LOG', 'ACCOUNT_DELETION_REQUEST', 'SMS_LOG', 'LOGIN_ATTEMPT', 'USER_SESSION',
+        'PASSWORD_RESET_TOKEN', 'OTP_CODE', 'POLICY_ACCEPTANCE', 'POLICY_DOCUMENT',
+        'ADMIN_PERMISSION_ASSIGNMENT', 'ADMIN_PERMISSION', 'STORED_FILE', 'SYSTEM_SETTING', 'APP_USER',
+        'PROFILE_SECTION', 'REPORT_REASON', 'SPOKEN_LANGUAGE', 'SKILL', 'EDUCATION_LEVEL',
+        'EMPLOYMENT_TYPE', 'JOB_CATEGORY', 'DISTRICT', 'REGION')) LOOP
+        EXECUTE IMMEDIATE 'DROP TABLE ' || t.table_name || ' CASCADE CONSTRAINTS PURGE';
+    END LOOP;
+
+    FOR o IN (SELECT object_name, object_type FROM user_objects
+               WHERE object_name IN ('HK_SETTING_NUM', 'HK_PROFILE_COMPLETION',
+                                     'HK_REFRESH_PROFILE_COMPLETION', 'HK_RUN_LIFECYCLE_JOBS',
+                                     'SEQ_APPLICATION_REF')) LOOP
+        EXECUTE IMMEDIATE 'DROP ' || o.object_type || ' ' || o.object_name;
+    END LOOP;
+END;
+/

@@ -1,0 +1,94 @@
+// HALOKAZI - Notifications, moderation & reports
+// Generated from db/halokazi.dbml - edit that file, not this one.
+// Grey tables belong to other modules (shown with their key only).
+
+Table notification_template [headercolor: #8E44AD] {
+  template_code varchar2(50) [pk]
+  channel varchar2(10) [not null, note: 'IN_APP | SMS | EMAIL']
+  title_en varchar2(200) [not null]
+  title_sw varchar2(200) [not null]
+  body_en varchar2(2000) [not null]
+  body_sw varchar2(2000) [not null]
+  is_active bool [not null, default: 1]
+  updated_at timestamptz [not null]
+}
+
+Table notification [headercolor: #8E44AD] {
+  notification_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  template_code varchar2(50) [ref: > notification_template.template_code]
+  title varchar2(200) [not null]
+  message varchar2(2000) [not null]
+  related_entity_type varchar2(30)
+  related_entity_id number
+  is_read bool [not null, default: 0]
+  read_at timestamptz
+  created_at timestamptz [not null]
+}
+
+Table user_report [headercolor: #8E44AD] {
+  report_id number [pk, increment]
+  reporter_user_id number [not null, ref: > app_user.user_id]
+  target_type varchar2(20) [not null, note: 'EMPLOYER | VACANCY | JOB_SEEKER']
+  target_employer_id number [ref: > employer.employer_id]
+  target_vacancy_id number [ref: > vacancy.vacancy_id]
+  target_user_id number [ref: > app_user.user_id]
+  reason_id number [not null, ref: > report_reason.reason_id]
+  description varchar2(2000)
+  status varchar2(20) [not null, note: 'OPEN | UNDER_INVESTIGATION | RESOLVED | REJECTED']
+  assigned_to number [ref: > app_user.user_id]
+  resolved_by number [ref: > app_user.user_id]
+  resolved_at timestamptz
+  resolution_action varchar2(30)
+  resolution_notes varchar2(2000)
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  Note: 'Exactly one explicit target column is filled, matching target_type'
+}
+
+Table report_export [headercolor: #8E44AD] {
+  export_id number [pk, increment]
+  requested_by number [not null, ref: > app_user.user_id]
+  report_type varchar2(40) [not null]
+  date_from date
+  date_to date
+  parameters json
+  export_format varchar2(5) [not null, note: 'XLSX | PDF']
+  status varchar2(20) [not null]
+  file_id number [ref: > stored_file.file_id]
+  error_message varchar2(1000)
+  requested_at timestamptz [not null]
+  completed_at timestamptz
+}
+
+Table app_user [headercolor: #BDC3C7] {
+  user_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+Table employer [headercolor: #BDC3C7] {
+  employer_id number [pk]
+  Note: 'Other module - see employer_management'
+}
+
+Table report_reason [headercolor: #BDC3C7] {
+  reason_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table stored_file [headercolor: #BDC3C7] {
+  file_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+Table vacancy [headercolor: #BDC3C7] {
+  vacancy_id number [pk]
+  Note: 'Other module - see vacancy_management'
+}
+
+TableGroup notifications_moderation_reports [color: #8E44AD] {
+  notification_template
+  notification
+  user_report
+  report_export
+}

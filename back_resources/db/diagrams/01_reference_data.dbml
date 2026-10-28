@@ -1,0 +1,114 @@
+// HALOKAZI - Reference data (lookup lists & settings)
+// Generated from db/halokazi.dbml - edit that file, not this one.
+// Grey tables belong to other modules (shown with their key only).
+
+Table region [headercolor: #7F8C8D] {
+  region_id number [pk, increment]
+  code varchar2(30) [not null, unique]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  zone varchar2(20) [not null, default: 'MAINLAND', note: 'MAINLAND | ZANZIBAR']
+  is_active bool [not null, default: 1]
+}
+
+Table district [headercolor: #7F8C8D] {
+  district_id number [pk, increment]
+  region_id number [not null, ref: > region.region_id]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  is_active bool [not null, default: 1]
+  indexes {
+    (region_id, name_en) [unique]
+  }
+}
+
+Table job_category [headercolor: #7F8C8D] {
+  category_id number [pk, increment]
+  code varchar2(40) [not null, unique]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  sort_order number [not null, default: 0]
+  is_active bool [not null, default: 1]
+}
+
+Table employment_type [headercolor: #7F8C8D] {
+  employment_type_id number [pk, increment]
+  code varchar2(30) [not null, unique]
+  name_en varchar2(60) [not null]
+  name_sw varchar2(60) [not null]
+  sort_order number [not null, default: 0]
+  is_active bool [not null, default: 1]
+}
+
+Table education_level [headercolor: #7F8C8D] {
+  education_level_id number [pk, increment]
+  code varchar2(30) [not null, unique]
+  name_en varchar2(80) [not null]
+  name_sw varchar2(80) [not null]
+  sort_order number [not null, note: 'ordered for minimum-education matching']
+  is_active bool [not null, default: 1]
+}
+
+Table skill [headercolor: #7F8C8D] {
+  skill_id number [pk, increment]
+  name_en varchar2(100) [not null, note: 'unique, case-insensitive']
+  name_sw varchar2(100)
+  category_id number [ref: > job_category.category_id]
+  is_active bool [not null, default: 1]
+  created_at timestamptz [not null]
+}
+
+Table spoken_language [headercolor: #7F8C8D] {
+  language_id number [pk, increment]
+  iso_code varchar2(10) [not null, unique]
+  name_en varchar2(60) [not null]
+  name_sw varchar2(60) [not null]
+  is_active bool [not null, default: 1]
+}
+
+Table report_reason [headercolor: #7F8C8D] {
+  reason_id number [pk, increment]
+  code varchar2(40) [not null, unique]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  applies_to varchar2(20) [not null, default: 'ALL']
+  is_active bool [not null, default: 1]
+}
+
+Table profile_section [headercolor: #7F8C8D] {
+  section_code varchar2(30) [pk, note: 'CONTACT, EDUCATION, WORK_EXPERIENCE, SKILLS, CERTIFICATIONS, LANGUAGES, ADDRESS, SUMMARY, PROFILE_PICTURE']
+  name_en varchar2(80) [not null]
+  name_sw varchar2(80) [not null]
+  weight number(5,2) [not null, note: 'completion weight %, total 100']
+  can_be_na bool [not null, default: 0]
+  sort_order number [not null]
+  is_active bool [not null, default: 1]
+}
+
+Table system_setting [headercolor: #7F8C8D] {
+  setting_key varchar2(60) [pk]
+  setting_value varchar2(400) [not null]
+  value_type varchar2(10) [not null]
+  description varchar2(400)
+  updated_by number [ref: > app_user.user_id]
+  updated_at timestamptz [not null]
+  Note: 'PROFILE_MIN_COMPLETION=75, OTP_TTL_SECONDS=120, OTP_MAX_RESENDS=3, SESSION_IDLE_TIMEOUT_MINUTES=10, DRAFT_VACANCY_EXPIRY_DAYS=14 ...'
+}
+
+Table app_user [headercolor: #BDC3C7] {
+  user_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+TableGroup reference_data [color: #7F8C8D] {
+  region
+  district
+  job_category
+  employment_type
+  education_level
+  skill
+  spoken_language
+  report_reason
+  profile_section
+  system_setting
+}

@@ -1,0 +1,167 @@
+// HALOKAZI - OVERVIEW (core entities only, keys + key fields)
+// Full detail: db/halokazi.dbml or the per-module files in this folder.
+// Hidden here: lookup lists, security/session tables, CV sections, profile sub-sections, audit columns.
+
+Project halokazi_overview {
+  database_type: 'Oracle'
+  Note: 'Halokazi core data model - overview'
+}
+
+// ---------- People & access ----------
+Table app_user [headercolor: #2C3E50] {
+  user_id number [pk]
+  full_name varchar2
+  role varchar2 [note: 'JOB_SEEKER | EMPLOYER | ADMIN | SUPER_ADMIN']
+  account_status varchar2
+}
+
+Table admin_permission [headercolor: #2C3E50] {
+  permission_id number [pk]
+  code varchar2
+}
+
+Table admin_permission_assignment [headercolor: #2C3E50] {
+  assignment_id number [pk]
+  user_id number [ref: > app_user.user_id]
+  permission_id number [ref: > admin_permission.permission_id]
+  assigned_by number [ref: > app_user.user_id, note: 'Super Admin']
+}
+
+// ---------- Job seeker side ----------
+Table job_seeker_profile [headercolor: #16A085] {
+  profile_id number [pk]
+  user_id number [ref: - app_user.user_id]
+  completion_percentage number [note: 'must be >= 75% to apply']
+  Note: 'Plus: education, work experience, skills, certifications, languages, references, projects, preferences'
+}
+
+Table certification [headercolor: #16A085] {
+  certification_id number [pk]
+  profile_id number [ref: > job_seeker_profile.profile_id]
+  certification_name varchar2
+}
+
+Table cv_template [headercolor: #16A085] {
+  template_id number [pk]
+  name_en varchar2 [note: '5 predefined']
+}
+
+Table cv [headercolor: #16A085] {
+  cv_id number [pk]
+  profile_id number [ref: > job_seeker_profile.profile_id]
+  template_id number [ref: > cv_template.template_id]
+  cv_name varchar2
+}
+
+// ---------- Employer side ----------
+Table employer [headercolor: #2980B9] {
+  employer_id number [pk]
+  user_id number [ref: - app_user.user_id]
+  business_name varchar2
+  tin varchar2 [note: 'one account per company']
+  verification_status varchar2 [note: 'PENDING_REVIEW | APPROVED | REJECTED']
+}
+
+Table employer_verification [headercolor: #2980B9] {
+  verification_id number [pk]
+  employer_id number [ref: > employer.employer_id]
+  status varchar2
+  reviewed_by number [ref: > app_user.user_id, note: 'Admin']
+  Note: 'Every submission kept; documents attached'
+}
+
+Table vacancy [headercolor: #2980B9] {
+  vacancy_id number [pk]
+  employer_id number [ref: > employer.employer_id]
+  job_title varchar2
+  application_deadline timestamptz
+  status varchar2 [note: 'DRAFT | ACTIVE | CLOSED | EXPIRED | DELETED']
+}
+
+Table vacancy_reopen_request [headercolor: #2980B9] {
+  request_id number [pk]
+  vacancy_id number [ref: > vacancy.vacancy_id]
+  status varchar2 [note: 'Admin approves']
+}
+
+Table saved_vacancy [headercolor: #16A085] {
+  profile_id number [pk, ref: > job_seeker_profile.profile_id]
+  vacancy_id number [pk, ref: > vacancy.vacancy_id]
+}
+
+// ---------- Where both sides meet ----------
+Table application [headercolor: #C0392B] {
+  application_id number [pk]
+  vacancy_id number [ref: > vacancy.vacancy_id]
+  profile_id number [ref: > job_seeker_profile.profile_id]
+  cv_id number [ref: > cv.cv_id]
+  status varchar2 [note: 'SUBMITTED -> IN_REVIEW -> REJECTED | SHORTLISTED']
+  cv_snapshot json [note: 'frozen copy + PDF']
+}
+
+Table application_certificate [headercolor: #C0392B] {
+  application_id number [pk, ref: > application.application_id]
+  certification_id number [pk, ref: > certification.certification_id]
+}
+
+Table application_status_history [headercolor: #C0392B] {
+  history_id number [pk]
+  application_id number [ref: > application.application_id]
+  to_status varchar2
+  Note: 'Immutable'
+}
+
+// ---------- Cross-cutting ----------
+Table notification [headercolor: #8E44AD] {
+  notification_id number [pk]
+  user_id number [ref: > app_user.user_id]
+  is_read bool
+}
+
+Table user_report [headercolor: #8E44AD] {
+  report_id number [pk]
+  reporter_user_id number [ref: > app_user.user_id]
+  target_employer_id number [ref: > employer.employer_id]
+  target_vacancy_id number [ref: > vacancy.vacancy_id]
+  target_user_id number [ref: > app_user.user_id]
+  status varchar2
+}
+
+Table audit_log [headercolor: #8E44AD] {
+  audit_id number [pk]
+  user_id number [ref: > app_user.user_id]
+  action varchar2
+}
+
+TableGroup people_access [color: #2C3E50] {
+  app_user
+  admin_permission
+  admin_permission_assignment
+}
+
+TableGroup job_seeker [color: #16A085] {
+  job_seeker_profile
+  certification
+  cv
+  cv_template
+  saved_vacancy
+}
+
+TableGroup employer_vacancy [color: #2980B9] {
+  employer
+  employer_verification
+  vacancy
+  vacancy_reopen_request
+}
+
+TableGroup applications [color: #C0392B] {
+  application
+  application_certificate
+  application_status_history
+}
+
+TableGroup cross_cutting [color: #8E44AD] {
+  notification
+  user_report
+  audit_log
+}

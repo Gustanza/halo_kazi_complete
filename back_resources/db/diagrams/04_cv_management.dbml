@@ -1,0 +1,64 @@
+// HALOKAZI - CV management
+// Generated from db/halokazi.dbml - edit that file, not this one.
+// Grey tables belong to other modules (shown with their key only).
+
+Table cv_template [headercolor: #27AE60] {
+  template_id number [pk, increment]
+  code varchar2(40) [not null, unique]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  description_en varchar2(500)
+  description_sw varchar2(500)
+  layout_definition clob
+  preview_file_id number [ref: > stored_file.file_id]
+  version number [not null, default: 1]
+  status varchar2(10) [not null, note: 'ACTIVE | INACTIVE']
+  sort_order number [not null, default: 0]
+  created_by number [ref: > app_user.user_id]
+  created_at timestamptz [not null]
+  updated_by number [ref: > app_user.user_id]
+  updated_at timestamptz [not null]
+}
+
+Table cv [headercolor: #27AE60] {
+  cv_id number [pk, increment]
+  profile_id number [not null, ref: > job_seeker_profile.profile_id]
+  template_id number [not null, ref: > cv_template.template_id]
+  cv_name varchar2(100) [not null]
+  headline varchar2(150)
+  summary_override clob
+  cv_language varchar2(2) [not null, default: 'EN']
+  latest_pdf_file_id number [ref: > stored_file.file_id]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: 'soft delete - applications keep their snapshot']
+}
+
+Table cv_section [headercolor: #27AE60] {
+  cv_id number [pk, ref: > cv.cv_id]
+  section_code varchar2(30) [pk, note: 'CONTACT, SUMMARY, WORK_EXPERIENCE, EDUCATION, SKILLS, CERTIFICATIONS, LANGUAGES, PROJECTS, ACHIEVEMENTS, REFERENCES, INTERESTS']
+  is_visible bool [not null, default: 1]
+  display_order number [not null]
+  custom_title varchar2(100)
+}
+
+Table app_user [headercolor: #BDC3C7] {
+  user_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+Table job_seeker_profile [headercolor: #BDC3C7] {
+  profile_id number [pk]
+  Note: 'Other module - see job_seeker_profile_group'
+}
+
+Table stored_file [headercolor: #BDC3C7] {
+  file_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+TableGroup cv_management [color: #27AE60] {
+  cv_template
+  cv
+  cv_section
+}

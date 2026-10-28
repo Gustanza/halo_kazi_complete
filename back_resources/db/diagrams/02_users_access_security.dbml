@@ -1,0 +1,196 @@
+// HALOKAZI - Users, access & security
+// Generated from db/halokazi.dbml - edit that file, not this one.
+// Grey tables belong to other modules (shown with their key only).
+
+Table app_user [headercolor: #2C3E50] {
+  user_id number [pk, increment]
+  full_name varchar2(150) [not null]
+  email varchar2(254) [not null, note: 'unique, case-insensitive']
+  phone varchar2(20) [not null, unique]
+  password_hash varchar2(255) [not null]
+  role varchar2(20) [not null, note: 'JOB_SEEKER | EMPLOYER | ADMIN | SUPER_ADMIN']
+  account_status varchar2(30) [not null, note: 'PENDING_VERIFICATION | ACTIVE | SUSPENDED | DEACTIVATED | DELETED']
+  phone_verified bool [not null, default: 0]
+  phone_verified_at timestamptz
+  preferred_language varchar2(2) [not null, default: 'EN', note: 'EN | SW']
+  failed_login_count number [not null, default: 0]
+  locked_until timestamptz
+  last_login_at timestamptz
+  password_changed_at timestamptz
+  suspended_at timestamptz
+  suspended_by number [ref: > app_user.user_id]
+  suspension_reason varchar2(500)
+  created_by number [ref: > app_user.user_id, note: 'required for ADMIN (Super Admin creator)']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz [note: 'soft delete']
+  anonymized_at timestamptz
+}
+
+Table stored_file [headercolor: #2C3E50] {
+  file_id number [pk, increment]
+  owner_user_id number [ref: > app_user.user_id]
+  file_category varchar2(40) [not null, note: 'PROFILE_PICTURE, CERTIFICATE, VERIFICATION_DOCUMENT, COMPANY_LOGO, CV_PDF, APPLICATION_CV_PDF, CV_TEMPLATE_PREVIEW, REPORT_EXPORT']
+  storage_provider varchar2(30) [not null]
+  storage_key varchar2(500) [not null, unique]
+  original_filename varchar2(255)
+  mime_type varchar2(100) [not null]
+  size_bytes number [not null]
+  checksum_sha256 varchar2(64)
+  scan_status varchar2(20) [not null, default: 'PENDING', note: 'PENDING | CLEAN | INFECTED | FAILED | NOT_REQUIRED']
+  scanned_at timestamptz
+  created_at timestamptz [not null]
+  deleted_at timestamptz
+}
+
+Table admin_permission [headercolor: #2C3E50] {
+  permission_id number [pk, increment]
+  code varchar2(60) [not null, unique]
+  module varchar2(40) [not null]
+  name_en varchar2(100) [not null]
+  name_sw varchar2(100) [not null]
+  description varchar2(400)
+  created_at timestamptz [not null]
+}
+
+Table admin_permission_assignment [headercolor: #2C3E50] {
+  assignment_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id, note: 'must be ADMIN']
+  permission_id number [not null, ref: > admin_permission.permission_id]
+  assigned_by number [not null, ref: > app_user.user_id, note: 'must be SUPER_ADMIN, never self']
+  assigned_at timestamptz [not null]
+  revoked_by number [ref: > app_user.user_id]
+  revoked_at timestamptz
+  Note: 'One active (revoked_at IS NULL) row per user+permission; revoked rows kept as history'
+}
+
+Table policy_document [headercolor: #2C3E50] {
+  policy_id number [pk, increment]
+  policy_type varchar2(30) [not null, note: 'TERMS | PRIVACY | DATA_CONSENT']
+  version varchar2(20) [not null]
+  title_en varchar2(200) [not null]
+  title_sw varchar2(200) [not null]
+  content_en clob [not null]
+  content_sw clob [not null]
+  effective_from timestamptz [not null]
+  is_current bool [not null, default: 0, note: 'one current per policy_type']
+  created_by number [ref: > app_user.user_id]
+  created_at timestamptz [not null]
+  indexes {
+    (policy_type, version) [unique]
+  }
+}
+
+Table policy_acceptance [headercolor: #2C3E50] {
+  acceptance_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  policy_id number [not null, ref: > policy_document.policy_id]
+  accepted_at timestamptz [not null]
+  ip_address varchar2(45)
+  user_agent varchar2(400)
+  indexes {
+    (user_id, policy_id) [unique]
+  }
+}
+
+Table otp_code [headercolor: #2C3E50] {
+  otp_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  phone varchar2(20) [not null]
+  purpose varchar2(30) [not null, note: 'PHONE_VERIFICATION | PASSWORD_RESET | PHONE_CHANGE']
+  code_hash varchar2(255) [not null]
+  expires_at timestamptz [not null, note: '+2 minutes']
+  resend_count number [not null, default: 0, note: 'max 3']
+  attempt_count number [not null, default: 0]
+  consumed_at timestamptz
+  ip_address varchar2(45)
+  created_at timestamptz [not null]
+}
+
+Table password_reset_token [headercolor: #2C3E50] {
+  token_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  token_hash varchar2(255) [not null, unique]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  ip_address varchar2(45)
+  created_at timestamptz [not null]
+}
+
+Table user_session [headercolor: #2C3E50] {
+  session_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  token_hash varchar2(255) [not null, unique]
+  ip_address varchar2(45)
+  user_agent varchar2(400)
+  created_at timestamptz [not null]
+  last_activity_at timestamptz [not null, note: '10 min idle timeout']
+  expires_at timestamptz [not null]
+  revoked_at timestamptz
+  revoke_reason varchar2(30)
+}
+
+Table login_attempt [headercolor: #2C3E50] {
+  attempt_id number [pk, increment]
+  identifier varchar2(254) [not null]
+  user_id number [ref: > app_user.user_id]
+  ip_address varchar2(45)
+  succeeded bool [not null]
+  failure_reason varchar2(40)
+  attempted_at timestamptz [not null]
+}
+
+Table sms_log [headercolor: #2C3E50] {
+  sms_id number [pk, increment]
+  user_id number [ref: > app_user.user_id]
+  phone varchar2(20) [not null]
+  purpose varchar2(30) [not null]
+  provider_message_id varchar2(100)
+  delivery_status varchar2(20) [not null, note: 'QUEUED | SENT | DELIVERED | FAILED']
+  error_message varchar2(500)
+  created_at timestamptz [not null]
+  sent_at timestamptz
+  delivered_at timestamptz
+}
+
+Table account_deletion_request [headercolor: #2C3E50] {
+  request_id number [pk, increment]
+  user_id number [not null, ref: > app_user.user_id]
+  reason varchar2(1000)
+  status varchar2(20) [not null, note: 'REQUESTED | COMPLETED | REJECTED | CANCELLED']
+  requested_at timestamptz [not null]
+  processed_by number [ref: > app_user.user_id]
+  processed_at timestamptz
+  notes varchar2(1000)
+}
+
+Table audit_log [headercolor: #2C3E50] {
+  audit_id number [pk, increment]
+  user_id number [ref: > app_user.user_id, note: 'NULL = system']
+  actor_role varchar2(20)
+  action varchar2(60) [not null]
+  entity_type varchar2(40)
+  entity_id number
+  result varchar2(10) [not null, note: 'SUCCESS | FAILURE | DENIED']
+  ip_address varchar2(45)
+  user_agent varchar2(400)
+  details json
+  created_at timestamptz [not null]
+  Note: 'Append-only (trigger blocks UPDATE/DELETE)'
+}
+
+TableGroup users_access_security [color: #2C3E50] {
+  app_user
+  stored_file
+  admin_permission
+  admin_permission_assignment
+  policy_document
+  policy_acceptance
+  otp_code
+  password_reset_token
+  user_session
+  login_attempt
+  sms_log
+  account_deletion_request
+  audit_log
+}

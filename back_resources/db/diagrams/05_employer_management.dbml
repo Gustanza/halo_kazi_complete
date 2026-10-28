@@ -1,0 +1,98 @@
+// HALOKAZI - Employer & verification
+// Generated from db/halokazi.dbml - edit that file, not this one.
+// Grey tables belong to other modules (shown with their key only).
+
+Table employer [headercolor: #2980B9] {
+  employer_id number [pk, increment]
+  user_id number [not null, unique, ref: - app_user.user_id]
+  business_name varchar2(200) [not null, note: 'locked after approval']
+  registration_number varchar2(60) [unique, note: 'locked after approval']
+  tin varchar2(20) [unique, note: 'one account per company; locked after approval']
+  business_licence_number varchar2(60) [note: 'locked after approval']
+  verification_status varchar2(20) [not null, note: 'NOT_SUBMITTED | PENDING_REVIEW | APPROVED | REJECTED']
+  approved_at timestamptz
+  representative_name varchar2(150)
+  representative_title varchar2(100)
+  representative_phone varchar2(20)
+  representative_email varchar2(254)
+  category_id number [ref: > job_category.category_id]
+  company_description clob
+  website varchar2(300)
+  company_email varchar2(254)
+  company_phone varchar2(20)
+  region_id number [ref: > region.region_id]
+  district_id number [ref: > district.district_id]
+  physical_address varchar2(300)
+  company_size varchar2(20)
+  logo_file_id number [ref: > stored_file.file_id]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+  deleted_at timestamptz
+  anonymized_at timestamptz
+}
+
+Table employer_verification [headercolor: #2980B9] {
+  verification_id number [pk, increment]
+  employer_id number [not null, ref: > employer.employer_id]
+  submission_no number [not null]
+  business_name varchar2(200) [not null]
+  registration_number varchar2(60) [not null]
+  tin varchar2(20) [not null]
+  business_licence_number varchar2(60) [not null]
+  representative_name varchar2(150) [not null]
+  representative_title varchar2(100)
+  representative_phone varchar2(20) [not null]
+  representative_email varchar2(254) [not null]
+  status varchar2(20) [not null, note: 'PENDING_REVIEW | APPROVED | REJECTED (final once decided)']
+  submitted_by number [not null, ref: > app_user.user_id]
+  submitted_at timestamptz [not null]
+  reviewed_by number [ref: > app_user.user_id]
+  reviewed_at timestamptz
+  decision_notes varchar2(2000)
+  indexes {
+    (employer_id, submission_no) [unique]
+  }
+  Note: 'Full submission history; one PENDING_REVIEW per employer'
+}
+
+Table employer_verification_doc [headercolor: #2980B9] {
+  document_id number [pk, increment]
+  verification_id number [not null, ref: > employer_verification.verification_id]
+  document_type varchar2(40) [not null, note: 'CERTIFICATE_OF_INCORPORATION | TIN_CERTIFICATE | BUSINESS_LICENCE | REPRESENTATIVE_ID | OTHER']
+  file_id number [not null, ref: > stored_file.file_id]
+  uploaded_at timestamptz [not null]
+  indexes {
+    (verification_id, document_type) [unique]
+  }
+}
+
+Table app_user [headercolor: #BDC3C7] {
+  user_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+Table district [headercolor: #BDC3C7] {
+  district_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table job_category [headercolor: #BDC3C7] {
+  category_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table region [headercolor: #BDC3C7] {
+  region_id number [pk]
+  Note: 'Other module - see reference_data'
+}
+
+Table stored_file [headercolor: #BDC3C7] {
+  file_id number [pk]
+  Note: 'Other module - see users_access_security'
+}
+
+TableGroup employer_management [color: #2980B9] {
+  employer
+  employer_verification
+  employer_verification_doc
+}
