@@ -30,7 +30,7 @@ const routes = [
   {
     path: '/dashboard/profile',
     name: 'profile',
-    component: () => import('../pages/job-seeker/views/PlaceholderView.vue'),
+    component: () => import('../pages/job-seeker/views/ProfileView.vue'),
     meta: { title: 'My Profile', description: 'Manage your personal details, work history and skills so employers see your best self.' },
   },
   {
@@ -48,13 +48,23 @@ const routes = [
   {
     path: '/dashboard/find-jobs',
     name: 'find-jobs',
-    component: () => import('../pages/job-seeker/views/PlaceholderView.vue'),
+    component: () => import('../pages/job-seeker/views/FindJobsView.vue'),
     meta: { title: 'Find Jobs', description: 'Search and filter thousands of job opportunities that match your profile.' },
   },
   {
+  path: '/dashboard/apply/:jobId',
+  name: 'job-application',
+  component: () => import( '../pages/job-seeker/views/JobApplicationView.vue')
+  },
+  {
+  path: '/dashboard/application-success',
+  name: 'application-success',
+  component: () => import('../pages/job-seeker/views/JobApplicationSuccessView.vue')
+ },
+  {
     path: '/dashboard/saved-jobs',
     name: 'saved-jobs',
-    component: () => import('../pages/job-seeker/views/PlaceholderView.vue'),
+    component: () => import('../pages/job-seeker/views/SavedJobsView.vue'),
     meta: { title: 'Saved Jobs', description: 'Jobs you bookmark while browsing will be saved here for later.' },
   },
   {
@@ -66,7 +76,7 @@ const routes = [
   {
     path: '/dashboard/job-alerts',
     name: 'job-alerts',
-    component: () => import('../pages/job-seeker/views/PlaceholderView.vue'),
+    component: () => import('../pages/job-seeker/views/JobAlertsView.vue'),
     meta: { title: 'Job Alerts', description: 'Set up alerts and get notified when matching jobs are posted.' },
   },
   {
