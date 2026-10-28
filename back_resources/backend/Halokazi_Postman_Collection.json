@@ -1,0 +1,376 @@
+{
+	"info": {
+		"_postman_id": "halokazi-backend-api-v1",
+		"name": "Halokazi Backend APIs (Vacancies, Saved Jobs, Applications, Alerts)",
+		"description": "Complete collection for Halokazi Backend APIs. Supports Find Jobs, Saved Jobs, Applications, and Job Alerts.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "1",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. Vacancies & Search",
+			"item": [
+				{
+					"name": "Get All Active Vacancies (Paginated)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/vacancies?page=0&size=10&sort=publishedAt,desc",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "vacancies"],
+							"query": [
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "10" },
+								{ "key": "sort", "value": "publishedAt,desc" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Search & Filter Vacancies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/vacancies?keyword=Engineer&categoryId=2&regionId=1&employmentTypeId=1&page=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "vacancies"],
+							"query": [
+								{ "key": "keyword", "value": "Engineer" },
+								{ "key": "categoryId", "value": "2" },
+								{ "key": "regionId", "value": "1" },
+								{ "key": "employmentTypeId", "value": "1" },
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "10" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Vacancy Details by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-User-Id",
+								"value": "{{userId}}",
+								"description": "Optional: resolves isSaved and hasApplied flags for logged in user"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/vacancies/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "vacancies", "1"]
+						}
+					}
+				},
+				{
+					"name": "Meta - Job Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/vacancies/meta/categories",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "vacancies", "meta", "categories"]
+						}
+					}
+				},
+				{
+					"name": "Meta - Employment Types",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/vacancies/meta/employment-types",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "vacancies", "meta", "employment-types"]
+						}
+					}
+				},
+				{
+					"name": "Meta - Regions",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/vacancies/meta/regions",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "vacancies", "meta", "regions"]
+						}
+					}
+				},
+				{
+					"name": "Meta - Districts for Region",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/vacancies/meta/districts?regionId=1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "vacancies", "meta", "districts"],
+							"query": [
+								{ "key": "regionId", "value": "1" }
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "2. Saved Jobs",
+			"item": [
+				{
+					"name": "Get My Saved Jobs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/saved-jobs",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "saved-jobs"]
+						}
+					}
+				},
+				{
+					"name": "Save / Bookmark Vacancy",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/saved-jobs/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "saved-jobs", "1"]
+						}
+					}
+				},
+				{
+					"name": "Check Saved Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/saved-jobs/1/status",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "saved-jobs", "1", "status"]
+						}
+					}
+				},
+				{
+					"name": "Remove Saved Vacancy",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/saved-jobs/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "saved-jobs", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "3. Job Applications",
+			"item": [
+				{
+					"name": "Get My Applications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/applications?page=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "applications"],
+							"query": [
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "10" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Submit Application",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"vacancyId\": 1,\n  \"cvId\": 1,\n  \"coverLetter\": \"Dear Hiring Team,\\n\\nI am very excited to apply for the Senior Java Backend Engineer position at Halotel. I bring strong hands-on experience in Spring Boot, Oracle, and enterprise architectures.\\n\\nSincerely,\\nRaymond Mwangi\",\n  \"requirementsConfirmed\": true\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/applications",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "applications"]
+						}
+					}
+				},
+				{
+					"name": "Check If Already Applied",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/applications/check/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "applications", "check", "1"]
+						}
+					}
+				},
+				{
+					"name": "Get Application Details by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/applications/1",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "applications", "1"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "4. Job Alerts & Notifications",
+			"item": [
+				{
+					"name": "Get Alert Preferences",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/job-alerts/preferences",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "job-alerts", "preferences"]
+						}
+					}
+				},
+				{
+					"name": "Update Alert Preferences",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"receiveJobAlerts\": true,\n  \"categoryIds\": [2, 4],\n  \"regionIds\": [1],\n  \"employmentTypeIds\": [1]\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/job-alerts/preferences",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "job-alerts", "preferences"]
+						}
+					}
+				},
+				{
+					"name": "Get Matched Alert Vacancies",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/job-alerts/matches",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "job-alerts", "matches"]
+						}
+					}
+				},
+				{
+					"name": "Get Notifications (Paginated)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/notifications?page=0&size=10",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "notifications"],
+							"query": [
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "10" }
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Unread Notification Count",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/notifications/unread-count",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "notifications", "unread-count"]
+						}
+					}
+				},
+				{
+					"name": "Mark Single Notification as Read",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/notifications/1/read",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "notifications", "1", "read"]
+						}
+					}
+				},
+				{
+					"name": "Mark All Notifications as Read",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "X-User-Id", "value": "{{userId}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/notifications/read-all",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "v1", "notifications", "read-all"]
+						}
+					}
+				}
+			]
+		}
+	]
+}
