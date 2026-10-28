@@ -36,14 +36,26 @@ const routes = [
   {
     path: '/dashboard/cv-builder',
     name: 'cv-builder-app',
-    component: () => import('../pages/job-seeker/views/PlaceholderView.vue'),
-    meta: { title: 'CV Builder', description: 'Build a professional CV in minutes using our guided template editor.' },
+    component: () => import('../pages/job-seeker/views/CvBuilder.vue'),
+    meta: { title: 'Choose CV Template' },
+  },
+  {
+    path: '/dashboard/cv-template',
+    name: 'cv-template',
+    component: () => import('../pages/job-seeker/views/CvTemplate.vue'),
+    meta: { title: 'CV Template' },
   },
   {
     path: '/dashboard/my-cvs',
     name: 'my-cvs',
-    component: () => import('../pages/job-seeker/views/PlaceholderView.vue'),
-    meta: { title: 'My CVs', description: 'All the CVs you have created and downloaded will show up here.' },
+    component: () => import('../pages/job-seeker/views/MyCvs.vue'),
+    meta: { title: 'My CVs' },
+  },
+  {
+    path: '/dashboard/view-cv',
+    name: 'view-cv',
+    component: () => import('../pages/job-seeker/views/ViewCv.vue'),
+    meta: { title: 'View CV' },
   },
   {
     path: '/dashboard/find-jobs',
@@ -60,8 +72,8 @@ const routes = [
   {
     path: '/dashboard/applications',
     name: 'applications',
-    component: () => import('../pages/job-seeker/views/PlaceholderView.vue'),
-    meta: { title: 'Applications', description: 'Track the status of every job you have applied to.' },
+    component: () => import('../pages/job-seeker/views/Applications.vue'),
+    meta: { title: 'Applications' },
   },
   {
     path: '/dashboard/job-alerts',
@@ -72,8 +84,8 @@ const routes = [
   {
     path: '/dashboard/settings',
     name: 'settings',
-    component: () => import('../pages/job-seeker/views/PlaceholderView.vue'),
-    meta: { title: 'Settings', description: 'Manage your account, notification and privacy preferences.' },
+    component: () => import('../pages/job-seeker/views/Settings.vue'),
+    meta: { title: 'Settings' },
   },
 
   // ---------- Admin portal (not built yet) ----------
