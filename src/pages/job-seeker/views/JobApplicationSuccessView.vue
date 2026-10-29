@@ -71,7 +71,7 @@ const jobDetails = ref({
         </h1>
         <p class="mt-0.5 text-xs text-slate-500">
           Your application has been successfully sent to the employer.
-          <span v-if="applicationId" class="text-slate-400">(Ref: {{ applicationId }})</span>
+          <span v-if="applicationId" class="text-slate-400"></span>
         </p>
       </div>
 
