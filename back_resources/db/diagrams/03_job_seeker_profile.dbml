@@ -37,7 +37,7 @@ Table profile_section_na [headercolor: #16A085] {
   Note: 'Sections marked Not Applicable (only where can_be_na = 1)'
 }
 
-Table education [headercolor: #16A085] {
+Table education [headercolor: #16a0a0ff] {
   education_id number [pk, increment]
   profile_id number [not null, ref: > job_seeker_profile.profile_id]
   education_level_id number [not null, ref: > education_level.education_level_id]
