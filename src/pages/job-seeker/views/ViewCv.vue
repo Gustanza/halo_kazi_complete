@@ -10,12 +10,14 @@ const route = useRoute()
 const router = useRouter()
 
 // Presentational layout metadata only (not CV data) for the 5 templates CvTemplate.vue builds.
+// Keyed by the real template code, not templateId - the backend's numeric ids follow DB
+// seed/insert order (CLASSIC, MODERN, PROFESSIONAL, MINIMAL, GRADUATE), not this list's order.
 const LAYOUTS = {
-  1: { name: 'Professional', layout: 'sidebar', sidebar: 'bg-blue-700', heading: 'text-blue-700' },
-  2: { name: 'Modern', layout: 'sidebar', sidebar: 'bg-orange-600', heading: 'text-orange-600' },
-  3: { name: 'Minimal', layout: 'minimal', sidebar: 'bg-slate-100', heading: 'text-slate-800' },
-  4: { name: 'Creative', layout: 'sidebar', sidebar: 'bg-purple-700', heading: 'text-purple-700' },
-  5: { name: 'Simple', layout: 'minimal', sidebar: 'bg-slate-100', heading: 'text-slate-800' },
+  PROFESSIONAL: { name: 'Professional', layout: 'sidebar', sidebar: 'bg-blue-700', heading: 'text-blue-700' },
+  MODERN: { name: 'Modern', layout: 'sidebar', sidebar: 'bg-orange-600', heading: 'text-orange-600' },
+  MINIMAL: { name: 'Minimal', layout: 'minimal', sidebar: 'bg-slate-100', heading: 'text-slate-800' },
+  GRADUATE: { name: 'Creative', layout: 'sidebar', sidebar: 'bg-purple-700', heading: 'text-purple-700' },
+  CLASSIC: { name: 'Simple', layout: 'minimal', sidebar: 'bg-slate-100', heading: 'text-slate-800' },
 }
 
 const loading = ref(true)
@@ -37,9 +39,7 @@ onMounted(async () => {
   }
 })
 
-const templateId = computed(() => record.value?.templateId || 1)
-
-const template = computed(() => LAYOUTS[templateId.value] || LAYOUTS[1])
+const template = computed(() => LAYOUTS[record.value?.templateCode] || LAYOUTS.PROFESSIONAL)
 
 // Normalizes the CV record's field names (fullName/jobTitle/degree/...) into the shape
 // this view's existing markup expects (name/role/course/...).
@@ -71,8 +71,20 @@ function backToMyCvs() {
   router.push('/dashboard/my-cvs')
 }
 
-function downloadPdf() {
-  window.print()
+async function downloadPdf() {
+  const cvId = route.query.cv
+  try {
+    const blob = await cvApi.downloadCv(cvId)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `cv-${cvId}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    // The rendered PDF endpoint failed - fall back to the browser's own print-to-PDF.
+    window.print()
+  }
 }
 </script>
 
@@ -256,7 +268,7 @@ function downloadPdf() {
         >
           <!-- Minimal header -->
           <header
-            v-if="templateId === 3"
+            v-if="record?.templateCode === 'MINIMAL'"
             class="mb-8 border-b-2 border-slate-300 pb-6 text-center"
           >
             <h2 class="text-3xl font-bold text-slate-900">

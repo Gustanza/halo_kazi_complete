@@ -47,6 +47,23 @@ const saveMessage = ref('')
 const loading = ref(true)
 const saving = ref(false)
 
+// Education/experience are added through small inline forms rather than editing an open-ended
+// list in place - each submit is its own immediate API call, since the real backend has no
+// bulk "save the whole profile" endpoint.
+const addingEducation = ref(false)
+const savingEducation = ref(false)
+const newEducation = ref({ qualification: '', institution: '', fieldOfStudy: '', startDate: '', endDate: '', currentlyStudying: false })
+const removingEducationId = ref(null)
+
+const addingExperience = ref(false)
+const savingExperience = ref(false)
+const newExperience = ref({ jobTitle: '', company: '', location: '', startDate: '', endDate: '', currentlyWorking: false, description: '' })
+const removingExperienceId = ref(null)
+
+const newSkillName = ref('')
+const addingSkill = ref(false)
+const removingSkillId = ref(null)
+
 const emptyProfile = () => ({
   personalInfo: {
     dateOfBirth: '',
@@ -62,7 +79,7 @@ const emptyProfile = () => ({
 })
 
 const profileData = ref(emptyProfile())
-const originalData = ref(emptyProfile())
+const originalPersonalInfo = ref(emptyProfile().personalInfo)
 
 function cloneData(data) {
   return JSON.parse(JSON.stringify(data))
@@ -73,7 +90,7 @@ async function loadProfile() {
   try {
     const data = await profileApi.getProfile()
     profileData.value = data
-    originalData.value = cloneData(data)
+    originalPersonalInfo.value = cloneData(data.personalInfo)
   } catch {
     toast.error('Could not load your profile.')
   } finally {
@@ -81,68 +98,130 @@ async function loadProfile() {
   }
 }
 
+/** Only the Personal Info section has a Save/Cancel pair - education/experience/skills save per action. */
 async function saveProfile() {
   saving.value = true
   try {
-    const saved = await profileApi.updateProfile(profileData.value)
-    profileData.value = saved
-    originalData.value = cloneData(saved)
+    const saved = await profileApi.updateProfile(profileData.value.personalInfo)
+    profileData.value.personalInfo = saved
+    originalPersonalInfo.value = cloneData(saved)
     isEditing.value = false
     saveMessage.value = 'Your profile has been saved.'
     window.setTimeout(() => { saveMessage.value = '' }, 3000)
   } catch {
-    saveMessage.value = 'Unable to save. Please try again.'
+    toast.error('Unable to save. Please try again.')
   } finally {
     saving.value = false
   }
 }
 
 function startEditing() {
-  originalData.value = cloneData(profileData.value)
+  originalPersonalInfo.value = cloneData(profileData.value.personalInfo)
   isEditing.value = true
   saveMessage.value = ''
 }
 
 function cancelEditing() {
-  profileData.value = cloneData(originalData.value)
+  profileData.value.personalInfo = cloneData(originalPersonalInfo.value)
   isEditing.value = false
   saveMessage.value = ''
 }
 
-function addEducation() {
-  profileData.value.education.push({
-    id: Date.now(),
-    qualification: '',
-    institution: '',
-    fieldOfStudy: '',
-    startDate: '',
-    endDate: '',
-    currentlyStudying: false
-  })
+function openAddEducation() {
+  newEducation.value = { qualification: '', institution: '', fieldOfStudy: '', startDate: '', endDate: '', currentlyStudying: false }
+  addingEducation.value = true
 }
 
-function addExperience() {
-  profileData.value.experience.push({
-    id: Date.now(),
-    jobTitle: '',
-    company: '',
-    location: '',
-    startDate: '',
-    endDate: '',
-    currentlyWorking: false,
-    description: ''
-  })
+async function submitEducation() {
+  if (!newEducation.value.qualification.trim() || !newEducation.value.institution.trim()) {
+    toast.error('Qualification and institution are required.')
+    return
+  }
+  savingEducation.value = true
+  try {
+    const saved = await profileApi.addEducation(newEducation.value)
+    profileData.value.education.push(saved)
+    addingEducation.value = false
+    toast.success('Education added.')
+  } catch {
+    toast.error('Could not add that education record.')
+  } finally {
+    savingEducation.value = false
+  }
 }
 
-function addSkill() {
-  profileData.value.skills.push({
-    id: Date.now(),
-    name: ''
-  })
+async function deleteEducation(item) {
+  removingEducationId.value = item.id
+  try {
+    await profileApi.removeEducation(item.id)
+    profileData.value.education = profileData.value.education.filter((e) => e.id !== item.id)
+  } catch {
+    toast.error('Could not remove that education record.')
+  } finally {
+    removingEducationId.value = null
+  }
 }
 
-function removeItem(section, index) {
-  profileData.value[section].splice(index, 1)
+function openAddExperience() {
+  newExperience.value = { jobTitle: '', company: '', location: '', startDate: '', endDate: '', currentlyWorking: false, description: '' }
+  addingExperience.value = true
+}
+
+async function submitExperience() {
+  if (!newExperience.value.jobTitle.trim() || !newExperience.value.company.trim()) {
+    toast.error('Job title and company are required.')
+    return
+  }
+  savingExperience.value = true
+  try {
+    const saved = await profileApi.addExperience(newExperience.value)
+    profileData.value.experience.push(saved)
+    addingExperience.value = false
+    toast.success('Experience added.')
+  } catch {
+    toast.error('Could not add that experience.')
+  } finally {
+    savingExperience.value = false
+  }
+}
+
+async function deleteExperience(item) {
+  removingExperienceId.value = item.id
+  try {
+    await profileApi.removeExperience(item.id)
+    profileData.value.experience = profileData.value.experience.filter((e) => e.id !== item.id)
+  } catch {
+    toast.error('Could not remove that experience.')
+  } finally {
+    removingExperienceId.value = null
+  }
+}
+
+async function submitSkill() {
+  const name = newSkillName.value.trim()
+  if (!name) return
+  addingSkill.value = true
+  try {
+    const saved = await profileApi.addSkill(name)
+    profileData.value.skills.push(saved)
+    newSkillName.value = ''
+  } catch {
+    toast.error('Could not add that skill.')
+  } finally {
+    addingSkill.value = false
+  }
+}
+
+async function deleteSkill(item) {
+  removingSkillId.value = item.id
+  try {
+    await profileApi.removeSkill(item.id)
+    profileData.value.skills = profileData.value.skills.filter((s) => s.id !== item.id)
+  } catch {
+    toast.error('Could not remove that skill.')
+  } finally {
+    removingSkillId.value = null
+  }
 }
 
 function goToStep(direction) {
@@ -360,7 +439,7 @@ onMounted(loadProfile)
 
           <label class="block text-xs font-bold text-gray-800">
             Date of Birth
-            <input v-if="isEditing" v-model="profileData.personalInfo.dateOfBirth" type="text" placeholder="12 May 1992"
+            <input v-if="isEditing" v-model="profileData.personalInfo.dateOfBirth" type="date"
               class="mt-1.5 block w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" />
             <p v-else class="mt-1.5 min-h-[40px] rounded-xl bg-gray-50/70 border border-gray-100 px-3.5 py-2.5 text-xs font-normal text-gray-900 flex items-center">
               {{ displayValue(personalInfo.dateOfBirth) }}
@@ -423,33 +502,51 @@ onMounted(loadProfile)
 
         <!-- Education Step View -->
         <div v-else-if="activeStep === 'education'" class="space-y-4">
-          <div v-if="isEditing" class="flex justify-end">
-            <button type="button" @click="addEducation"
+          <div class="flex justify-end">
+            <button v-if="!addingEducation" type="button" @click="openAddEducation"
               class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm cursor-pointer"
               style="background: #ff5a0a">
               <Plus :size="15" /> Add Education
             </button>
           </div>
 
-          <article v-for="(item, index) in profileData.education" :key="item.id || index"
-            class="rounded-xl border border-gray-200 p-4 space-y-3">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-gray-800">Education #{{ index + 1 }}</span>
-              <button v-if="isEditing" type="button" @click="removeItem('education', index)"
-                class="rounded-lg p-1.5 text-red-500 hover:bg-red-50 cursor-pointer">
+          <form v-if="addingEducation" class="rounded-xl border border-gray-200 p-4 space-y-3" @submit.prevent="submitEducation">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <input v-model="newEducation.qualification" placeholder="Qualification" class="field-input" />
+              <input v-model="newEducation.institution" placeholder="Institution" class="field-input" />
+              <input v-model="newEducation.startDate" type="date" class="field-input" />
+              <input v-model="newEducation.endDate" type="date" :disabled="newEducation.currentlyStudying" class="field-input disabled:opacity-50" />
+              <label class="flex items-center gap-2 text-xs text-gray-600 sm:col-span-2">
+                <input v-model="newEducation.currentlyStudying" type="checkbox" /> I'm currently studying here
+              </label>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button type="button" @click="addingEducation = false" class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 cursor-pointer">Cancel</button>
+              <button type="submit" :disabled="savingEducation" class="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-60 cursor-pointer" style="background:#ff5a0a">
+                {{ savingEducation ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </form>
+
+          <article v-for="item in profileData.education" :key="item.id"
+            class="rounded-xl border border-gray-200 p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-sm font-bold text-gray-900">{{ item.qualification }}</p>
+                <p class="mt-0.5 text-xs text-gray-500">{{ item.institution }}</p>
+                <p class="mt-1 text-xs text-gray-400">{{ item.startDate || '—' }} - {{ item.currentlyStudying ? 'Present' : (item.endDate || '—') }}</p>
+              </div>
+              <button type="button" :disabled="removingEducationId === item.id" @click="deleteEducation(item)"
+                class="rounded-lg p-1.5 text-red-500 hover:bg-red-50 cursor-pointer disabled:opacity-50">
                 <Trash2 :size="15" />
               </button>
             </div>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <input v-if="isEditing" v-model="item.qualification" placeholder="Qualification" class="field-input" />
-              <input v-if="isEditing" v-model="item.institution" placeholder="Institution" class="field-input" />
-            </div>
           </article>
 
-          <div v-if="!profileData.education.length" class="rounded-xl border border-dashed border-gray-200 p-8 text-center space-y-3">
+          <div v-if="!profileData.education.length && !addingEducation" class="rounded-xl border border-dashed border-gray-200 p-8 text-center space-y-3">
             <GraduationCap :size="32" class="mx-auto text-gray-400" />
             <p class="text-xs font-semibold text-gray-800">No education added yet</p>
-            <button type="button" @click="startEditing(); addEducation()" class="rounded-xl px-4 py-2 text-xs font-semibold text-white cursor-pointer" style="background:#ff5a0a">
+            <button type="button" @click="openAddEducation" class="rounded-xl px-4 py-2 text-xs font-semibold text-white cursor-pointer" style="background:#ff5a0a">
               Add Education
             </button>
           </div>
@@ -457,33 +554,54 @@ onMounted(loadProfile)
 
         <!-- Experience Step View -->
         <div v-else-if="activeStep === 'experience'" class="space-y-4">
-          <div v-if="isEditing" class="flex justify-end">
-            <button type="button" @click="addExperience"
+          <div class="flex justify-end">
+            <button v-if="!addingExperience" type="button" @click="openAddExperience"
               class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm cursor-pointer"
               style="background: #ff5a0a">
               <Plus :size="15" /> Add Experience
             </button>
           </div>
 
-          <article v-for="(item, index) in profileData.experience" :key="item.id || index"
-            class="rounded-xl border border-gray-200 p-4 space-y-3">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-gray-800">Experience #{{ index + 1 }}</span>
-              <button v-if="isEditing" type="button" @click="removeItem('experience', index)"
-                class="rounded-lg p-1.5 text-red-500 hover:bg-red-50 cursor-pointer">
+          <form v-if="addingExperience" class="rounded-xl border border-gray-200 p-4 space-y-3" @submit.prevent="submitExperience">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <input v-model="newExperience.jobTitle" placeholder="Job Title" class="field-input" />
+              <input v-model="newExperience.company" placeholder="Company" class="field-input" />
+              <input v-model="newExperience.location" placeholder="Location" class="field-input" />
+              <input v-model="newExperience.startDate" type="date" class="field-input" />
+              <input v-model="newExperience.endDate" type="date" :disabled="newExperience.currentlyWorking" class="field-input disabled:opacity-50" />
+              <label class="flex items-center gap-2 text-xs text-gray-600">
+                <input v-model="newExperience.currentlyWorking" type="checkbox" /> I currently work here
+              </label>
+              <textarea v-model="newExperience.description" rows="2" placeholder="Description" class="field-input sm:col-span-2 resize-none"></textarea>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button type="button" @click="addingExperience = false" class="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 cursor-pointer">Cancel</button>
+              <button type="submit" :disabled="savingExperience" class="rounded-lg px-3 py-2 text-xs font-semibold text-white disabled:opacity-60 cursor-pointer" style="background:#ff5a0a">
+                {{ savingExperience ? 'Saving…' : 'Save' }}
+              </button>
+            </div>
+          </form>
+
+          <article v-for="item in profileData.experience" :key="item.id"
+            class="rounded-xl border border-gray-200 p-4">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-sm font-bold text-gray-900">{{ item.jobTitle }}</p>
+                <p class="mt-0.5 text-xs text-gray-500">{{ item.company }}<span v-if="item.location"> · {{ item.location }}</span></p>
+                <p class="mt-1 text-xs text-gray-400">{{ item.startDate || '—' }} - {{ item.currentlyWorking ? 'Present' : (item.endDate || '—') }}</p>
+                <p v-if="item.description" class="mt-2 text-xs leading-5 text-gray-600">{{ item.description }}</p>
+              </div>
+              <button type="button" :disabled="removingExperienceId === item.id" @click="deleteExperience(item)"
+                class="rounded-lg p-1.5 text-red-500 hover:bg-red-50 cursor-pointer disabled:opacity-50">
                 <Trash2 :size="15" />
               </button>
             </div>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <input v-if="isEditing" v-model="item.jobTitle" placeholder="Job Title" class="field-input" />
-              <input v-if="isEditing" v-model="item.company" placeholder="Company" class="field-input" />
-            </div>
           </article>
 
-          <div v-if="!profileData.experience.length" class="rounded-xl border border-dashed border-gray-200 p-8 text-center space-y-3">
+          <div v-if="!profileData.experience.length && !addingExperience" class="rounded-xl border border-dashed border-gray-200 p-8 text-center space-y-3">
             <BriefcaseBusiness :size="32" class="mx-auto text-gray-400" />
             <p class="text-xs font-semibold text-gray-800">No experience added yet</p>
-            <button type="button" @click="startEditing(); addExperience()" class="rounded-xl px-4 py-2 text-xs font-semibold text-white cursor-pointer" style="background:#ff5a0a">
+            <button type="button" @click="openAddExperience" class="rounded-xl px-4 py-2 text-xs font-semibold text-white cursor-pointer" style="background:#ff5a0a">
               Add Experience
             </button>
           </div>
@@ -491,29 +609,29 @@ onMounted(loadProfile)
 
         <!-- Skills Step View -->
         <div v-else-if="activeStep === 'skills'" class="space-y-4">
-          <div v-if="isEditing" class="flex justify-end">
-            <button type="button" @click="addSkill"
-              class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm cursor-pointer"
-              style="background: #ff5a0a">
-              <Plus :size="15" /> Add Skill
+          <form class="flex gap-2" @submit.prevent="submitSkill">
+            <input v-model="newSkillName" placeholder="e.g. JavaScript" class="field-input" />
+            <button type="submit" :disabled="addingSkill" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm disabled:opacity-60 cursor-pointer" style="background: #ff5a0a">
+              <Plus :size="15" /> Add
             </button>
-          </div>
+          </form>
 
           <div v-if="profileData.skills.length" class="grid gap-3 sm:grid-cols-2">
-            <div v-for="(skill, index) in profileData.skills" :key="skill.id || index"
+            <div v-for="skill in profileData.skills" :key="skill.id"
               class="flex items-center gap-3 rounded-xl border border-gray-200 p-3">
               <Award :size="18" class="text-green-600 shrink-0" />
-              <input v-if="isEditing" v-model="skill.name" placeholder="Skill name" class="w-full text-xs outline-none" />
-              <span v-else class="text-xs font-medium text-gray-800">{{ skill.name }}</span>
+              <span class="flex-1 text-xs font-medium text-gray-800">{{ skill.name }}</span>
+              <button type="button" :disabled="removingSkillId === skill.id" @click="deleteSkill(skill)"
+                class="rounded-lg p-1 text-red-500 hover:bg-red-50 cursor-pointer disabled:opacity-50">
+                <X :size="14" />
+              </button>
             </div>
           </div>
 
           <div v-if="!profileData.skills.length" class="rounded-xl border border-dashed border-gray-200 p-8 text-center space-y-3">
             <Code2 :size="32" class="mx-auto text-gray-400" />
             <p class="text-xs font-semibold text-gray-800">No skills added yet</p>
-            <button type="button" @click="startEditing(); addSkill()" class="rounded-xl px-4 py-2 text-xs font-semibold text-white cursor-pointer" style="background:#ff5a0a">
-              Add Skill
-            </button>
+            <p class="text-[11px] text-gray-400">Use the field above to add your first skill.</p>
           </div>
         </div>
       </section>

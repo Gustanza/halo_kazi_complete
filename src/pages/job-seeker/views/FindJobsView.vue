@@ -1,6 +1,6 @@
 
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Search,
@@ -19,19 +19,26 @@ import EmptyState from '../../../components/ui/EmptyState.vue'
 import Skeleton from '../../../components/ui/Skeleton.vue'
 import * as jobsApi from '../../../api/jobs'
 import * as applicationsApi from '../../../api/applications'
+import { getLookups } from '../../../api/publicApi'
 import { useToast } from '../../../composables/useToast'
 
 const router = useRouter()
 const toast = useToast()
 
 const searchText = ref('')
-const locationFilter = ref('')
-const categoryFilter = ref('All Categories')
-const jobTypeFilter = ref('All Jobs')
+const locationFilter = ref('') // region code
+const categoryFilter = ref('') // category code
+const jobTypeFilter = ref('') // employment type code; '' = all
 const currentPage = ref(1)
 const pageSize = 3
 
-const categories = ref([])
+const categories = ref([]) // {code, nameEn}[]
+const regions = ref([]) // {code, nameEn}[]
+const employmentTypes = ref([]) // {code, nameEn}[]
+const jobTypeOptions = computed(() => [
+  { code: '', label: 'All Jobs' },
+  ...employmentTypes.value.map((t) => ({ code: t.code, label: t.nameEn })),
+])
 const jobs = ref([])
 const total = ref(0)
 const loading = ref(true)
@@ -73,13 +80,20 @@ watch(searchText, () => {
 })
 
 onMounted(async () => {
-  categories.value = await jobsApi.listCategories()
+  try {
+    const lookups = await getLookups()
+    categories.value = lookups.categories
+    regions.value = lookups.regions
+    employmentTypes.value = lookups.employmentTypes
+  } catch {
+    // Filters just stay empty; search/pagination still work without them.
+  }
   load()
 })
 onUnmounted(() => window.clearTimeout(debounceTimer))
 
-function setJobType(type) {
-  jobTypeFilter.value = type
+function setJobType(code) {
+  jobTypeFilter.value = code
   resetPage()
 }
 
@@ -111,8 +125,8 @@ async function applyForJob(jobId) {
 function clearFilters() {
   searchText.value = ''
   locationFilter.value = ''
-  categoryFilter.value = 'All Categories'
-  setJobType('All Jobs')
+  categoryFilter.value = ''
+  setJobType('')
 }
 </script>
 
@@ -170,13 +184,14 @@ function clearFilters() {
             style="border-color:#ffd3bd"
           >
             <MapPin :size="17" class="shrink-0 text-slate-700" />
-            <input
+            <select
               v-model="locationFilter"
-              type="text"
-              placeholder="All locations"
-              class="min-w-0 w-full py-2 text-xs text-slate-800 outline-none placeholder:text-slate-600"
+              class="min-w-0 w-full bg-white py-2 text-xs text-slate-800 outline-none"
               @change="resetPage"
-            />
+            >
+              <option value="">All locations</option>
+              <option v-for="region in regions" :key="region.code" :value="region.code">{{ region.nameEn }}</option>
+            </select>
           </label>
 
           <label
@@ -189,8 +204,8 @@ function clearFilters() {
               class="min-w-0 w-full bg-white py-2 text-xs text-slate-800 outline-none"
               @change="resetPage"
             >
-              <option>All Categories</option>
-              <option v-for="cat in categories" :key="cat">{{ cat }}</option>
+              <option value="">All Categories</option>
+              <option v-for="cat in categories" :key="cat.code" :value="cat.code">{{ cat.nameEn }}</option>
             </select>
           </label>
 
@@ -209,16 +224,16 @@ function clearFilters() {
       <!-- Job type chips -->
       <div class="flex flex-wrap gap-2">
         <button
-          v-for="type in ['All Jobs', 'Full time', 'Part time', 'Remote']"
-          :key="type"
+          v-for="opt in jobTypeOptions"
+          :key="opt.code"
           type="button"
           class="rounded-md border px-3 py-2 text-xs font-medium transition"
-          :style="jobTypeFilter === type
+          :style="jobTypeFilter === opt.code
             ? 'background:#ff5a0a;color:white;border-color:#ff5a0a'
             : 'background:white;color:#273244;border-color:#ffd3bd'"
-          @click="setJobType(type)"
+          @click="setJobType(opt.code)"
         >
-          {{ type }}
+          {{ opt.label }}
         </button>
 
         <RouterLink
@@ -322,10 +337,11 @@ function clearFilters() {
 
                 <div class="flex w-full items-center justify-between gap-2 sm:justify-end">
                   <p class="text-[10px] text-slate-600 sm:text-right">
-                    <strong class="text-[11px] text-slate-900">
+                    <strong v-if="job.salaryMin != null && job.salaryMax != null" class="text-[11px] text-slate-900">
                       {{ job.salaryCurrency }} {{ job.salaryMin.toLocaleString() }} - {{ job.salaryMax.toLocaleString() }}
                     </strong>
-                    <span class="block">/ month</span>
+                    <strong v-else class="text-[11px] text-slate-500">Salary not disclosed</strong>
+                    <span v-if="job.salaryMin != null && job.salaryMax != null" class="block">/ month</span>
                   </p>
 
                   <button

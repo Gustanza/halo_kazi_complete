@@ -4,7 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tz.co.halotel.halokazi.common.dto.ApiResponse;
 import tz.co.halotel.halokazi.jobseeker.model.Education;
-import tz.co.halotel.halokazi.jobseeker.repository.JobSeekerDataStore;
+import tz.co.halotel.halokazi.jobseeker.service.CurrentJobSeekerProvider;
 import tz.co.halotel.halokazi.jobseeker.service.EducationService;
 
 import java.util.List;
@@ -14,44 +14,36 @@ import java.util.List;
 public class JobSeekerEducationController {
 
     private final EducationService educationService;
+    private final CurrentJobSeekerProvider currentJobSeeker;
 
-    public JobSeekerEducationController(EducationService educationService) {
+    public JobSeekerEducationController(EducationService educationService, CurrentJobSeekerProvider currentJobSeeker) {
         this.educationService = educationService;
+        this.currentJobSeeker = currentJobSeeker;
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Education>>> getEducations(
-            @RequestParam(required = false) Long profileId) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        return ResponseEntity.ok(ApiResponse.success(educationService.getEducations(targetId)));
+    public ResponseEntity<ApiResponse<List<Education>>> getEducations() {
+        return ResponseEntity.ok(ApiResponse.success(educationService.getEducations(currentJobSeeker.getCurrentProfileId())));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Education>> addEducation(
-            @RequestParam(required = false) Long profileId,
-            @RequestBody Education education) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        Education saved = educationService.saveEducation(targetId, education);
+    public ResponseEntity<ApiResponse<Education>> addEducation(@RequestBody Education education) {
+        Education saved = educationService.saveEducation(currentJobSeeker.getCurrentProfileId(), education);
         return ResponseEntity.ok(ApiResponse.success("Education record added successfully", saved));
     }
 
     @PutMapping("/{educationId}")
     public ResponseEntity<ApiResponse<Education>> updateEducation(
             @PathVariable Long educationId,
-            @RequestParam(required = false) Long profileId,
             @RequestBody Education education) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
         education.setEducationId(educationId);
-        Education updated = educationService.saveEducation(targetId, education);
+        Education updated = educationService.saveEducation(currentJobSeeker.getCurrentProfileId(), education);
         return ResponseEntity.ok(ApiResponse.success("Education record updated successfully", updated));
     }
 
     @DeleteMapping("/{educationId}")
-    public ResponseEntity<ApiResponse<Void>> deleteEducation(
-            @PathVariable Long educationId,
-            @RequestParam(required = false) Long profileId) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        boolean deleted = educationService.deleteEducation(targetId, educationId);
+    public ResponseEntity<ApiResponse<Void>> deleteEducation(@PathVariable Long educationId) {
+        boolean deleted = educationService.deleteEducation(currentJobSeeker.getCurrentProfileId(), educationId);
         if (!deleted) {
             return ResponseEntity.notFound().build();
         }

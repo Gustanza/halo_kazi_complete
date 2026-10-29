@@ -22,8 +22,16 @@ const cvs = ref([])
 const deleteTarget = ref(null)
 const deleting = ref(false)
 
-// Visual theme/preview per template id - matches the 5 layouts CvBuilder.vue offers.
-const THEME_BY_TEMPLATE = { 1: 'professional', 2: 'modern', 3: 'minimal', 4: 'creative', 5: 'simple' }
+// Visual theme/preview per real template code - matches the 5 layouts CvBuilder.vue offers.
+// Keyed by code, not templateId: the real backend's numeric ids follow DB seed/insert order
+// (CLASSIC, MODERN, PROFESSIONAL, MINIMAL, GRADUATE), not the order these themes are listed in.
+const THEME_BY_TEMPLATE = {
+  CLASSIC: 'simple',
+  MODERN: 'modern',
+  PROFESSIONAL: 'professional',
+  MINIMAL: 'minimal',
+  GRADUATE: 'creative',
+}
 
 async function load() {
   loading.value = true
@@ -50,7 +58,7 @@ const cvList = computed(() =>
     description: cv.summary || cv.professionalTitle,
     created: formatDate(cv.createdAt),
     updated: formatDate(cv.updatedAt),
-    theme: THEME_BY_TEMPLATE[cv.templateId] || 'simple',
+    theme: THEME_BY_TEMPLATE[cv.templateCode] || 'simple',
     default: cv.isLastUsed,
     status: cv.isLastUsed ? 'Default' : 'Non Default',
   }))
@@ -83,6 +91,20 @@ function useCv(cv) {
     path: '/dashboard/cv-builder',
     query: { cv: cv.id },
   })
+}
+
+async function downloadCv(cv) {
+  try {
+    const blob = await cvApi.downloadCv(cv.id)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${cv.cvName || 'cv'}.pdf`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch {
+    toast.error('Could not download this CV. Please try again.')
+  }
 }
 
 async function setDefault(cv) {
@@ -303,7 +325,7 @@ async function deleteCv() {
               </button>
 
               <button
-                @click="useCv(cv)"
+                @click="downloadCv(cv)"
                 class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50"
               >
                 <Download :size="15" /> Download

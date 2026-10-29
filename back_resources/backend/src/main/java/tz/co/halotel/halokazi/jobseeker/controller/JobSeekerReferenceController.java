@@ -4,7 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tz.co.halotel.halokazi.common.dto.ApiResponse;
 import tz.co.halotel.halokazi.jobseeker.model.ProfileReference;
-import tz.co.halotel.halokazi.jobseeker.repository.JobSeekerDataStore;
+import tz.co.halotel.halokazi.jobseeker.service.CurrentJobSeekerProvider;
 import tz.co.halotel.halokazi.jobseeker.service.ReferenceService;
 
 import java.util.List;
@@ -14,33 +14,27 @@ import java.util.List;
 public class JobSeekerReferenceController {
 
     private final ReferenceService referenceService;
+    private final CurrentJobSeekerProvider currentJobSeeker;
 
-    public JobSeekerReferenceController(ReferenceService referenceService) {
+    public JobSeekerReferenceController(ReferenceService referenceService, CurrentJobSeekerProvider currentJobSeeker) {
         this.referenceService = referenceService;
+        this.currentJobSeeker = currentJobSeeker;
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ProfileReference>>> getReferences(
-            @RequestParam(required = false) Long profileId) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        return ResponseEntity.ok(ApiResponse.success(referenceService.getReferences(targetId)));
+    public ResponseEntity<ApiResponse<List<ProfileReference>>> getReferences() {
+        return ResponseEntity.ok(ApiResponse.success(referenceService.getReferences(currentJobSeeker.getCurrentProfileId())));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<ProfileReference>> addReference(
-            @RequestParam(required = false) Long profileId,
-            @RequestBody ProfileReference reference) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        ProfileReference saved = referenceService.saveReference(targetId, reference);
+    public ResponseEntity<ApiResponse<ProfileReference>> addReference(@RequestBody ProfileReference reference) {
+        ProfileReference saved = referenceService.saveReference(currentJobSeeker.getCurrentProfileId(), reference);
         return ResponseEntity.ok(ApiResponse.success("Reference added successfully", saved));
     }
 
     @DeleteMapping("/{referenceId}")
-    public ResponseEntity<ApiResponse<Void>> deleteReference(
-            @PathVariable Long referenceId,
-            @RequestParam(required = false) Long profileId) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        boolean deleted = referenceService.deleteReference(targetId, referenceId);
+    public ResponseEntity<ApiResponse<Void>> deleteReference(@PathVariable Long referenceId) {
+        boolean deleted = referenceService.deleteReference(currentJobSeeker.getCurrentProfileId(), referenceId);
         if (!deleted) {
             return ResponseEntity.notFound().build();
         }

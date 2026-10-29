@@ -1,18 +1,13 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import {
   Bell,
-  Search,
-  Plus,
+  BriefcaseBusiness,
   MapPin,
-  Trash2,
 } from 'lucide-vue-next'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
 import PageHeader from '../../../components/ui/PageHeader.vue'
 import AppButton from '../../../components/ui/AppButton.vue'
-import AppModal from '../../../components/ui/AppModal.vue'
-import AppInput from '../../../components/ui/AppInput.vue'
-import ConfirmDialog from '../../../components/ui/ConfirmDialog.vue'
 import EmptyState from '../../../components/ui/EmptyState.vue'
 import Skeleton from '../../../components/ui/Skeleton.vue'
 import * as notificationsApi from '../../../api/notifications'
@@ -20,83 +15,78 @@ import { useToast } from '../../../composables/useToast'
 
 const toast = useToast()
 
-const searchText = ref('')
 const loading = ref(true)
-const jobAlerts = ref([])
+const saving = ref(false)
 
-const createOpen = ref(false)
-const creating = ref(false)
-const newKeyword = ref('')
-const newLocation = ref('')
+const receiveJobAlerts = ref(true)
+const categoryIds = ref([])
+const regionIds = ref([])
+const employmentTypeIds = ref([])
 
-const togglingId = ref(null)
-const deleteTarget = ref(null)
-const deleting = ref(false)
+const categories = ref([])
+const regions = ref([])
+const employmentTypes = ref([])
 
-const filteredAlerts = computed(() => {
-  const query = searchText.value.trim().toLowerCase()
-  if (!query) return jobAlerts.value
-  return jobAlerts.value.filter((alert) =>
-    [alert.keyword, alert.location].join(' ').toLowerCase().includes(query),
-  )
-})
+const matches = ref([])
+const matchesLoading = ref(false)
+
+function toggleId(list, id) {
+  const index = list.indexOf(id)
+  if (index === -1) list.push(id)
+  else list.splice(index, 1)
+}
+
+async function loadMatches() {
+  matchesLoading.value = true
+  try {
+    matches.value = await notificationsApi.getMatchedVacancies()
+  } catch {
+    // Non-blocking - the preferences form above is the important part of this page.
+    matches.value = []
+  } finally {
+    matchesLoading.value = false
+  }
+}
 
 async function load() {
   loading.value = true
   try {
-    jobAlerts.value = await notificationsApi.listAlerts()
+    const [preferences, cats, regs, types] = await Promise.all([
+      notificationsApi.getAlertPreferences(),
+      notificationsApi.getJobCategories(),
+      notificationsApi.getRegions(),
+      notificationsApi.getEmploymentTypes(),
+    ])
+    receiveJobAlerts.value = preferences.receiveJobAlerts
+    categoryIds.value = [...preferences.categoryIds]
+    regionIds.value = [...preferences.regionIds]
+    employmentTypeIds.value = [...preferences.employmentTypeIds]
+    categories.value = cats
+    regions.value = regs
+    employmentTypes.value = types
+    loadMatches()
   } catch {
-    toast.error('Could not load your job alerts.')
+    toast.error('Could not load your job alert preferences.')
   } finally {
     loading.value = false
   }
 }
 
-async function toggleAlertStatus(id) {
-  togglingId.value = id
+async function savePreferences() {
+  saving.value = true
   try {
-    await notificationsApi.toggleAlert(id)
-    const alert = jobAlerts.value.find((a) => a.id === id)
-    if (alert) alert.active = !alert.active
-  } catch {
-    toast.error('Could not update that alert.')
-  } finally {
-    togglingId.value = null
-  }
-}
-
-async function createAlert() {
-  if (!newKeyword.value.trim()) return
-  creating.value = true
-  try {
-    const alert = await notificationsApi.createAlert({
-      keyword: newKeyword.value.trim(),
-      location: newLocation.value.trim() || 'Any location',
+    await notificationsApi.updateAlertPreferences({
+      receiveJobAlerts: receiveJobAlerts.value,
+      categoryIds: categoryIds.value,
+      regionIds: regionIds.value,
+      employmentTypeIds: employmentTypeIds.value,
     })
-    jobAlerts.value = [...jobAlerts.value, alert]
-    toast.success('Job alert created.')
-    createOpen.value = false
-    newKeyword.value = ''
-    newLocation.value = ''
+    toast.success('Job alert preferences saved.')
+    loadMatches()
   } catch {
-    toast.error('Could not create that alert.')
+    toast.error('Could not save your preferences. Please try again.')
   } finally {
-    creating.value = false
-  }
-}
-
-async function confirmDelete() {
-  if (!deleteTarget.value) return
-  deleting.value = true
-  try {
-    await notificationsApi.deleteAlert(deleteTarget.value.id)
-    jobAlerts.value = jobAlerts.value.filter((a) => a.id !== deleteTarget.value.id)
-    toast.success('Job alert deleted.')
-  } catch {
-    toast.error('Could not delete that alert.')
-  } finally {
-    deleting.value = false
-    deleteTarget.value = null
+    saving.value = false
   }
 }
 
@@ -105,119 +95,122 @@ onMounted(load)
 
 <template>
   <DashboardLayout>
-    <div class="mx-auto max-w-7xl space-y-6">
+    <div class="mx-auto max-w-4xl space-y-6">
+      <PageHeader title="Job Alerts" description="Get notified when new jobs matching your preferences are posted." />
 
-      <!-- Top Search bar -->
-      <div class="relative w-full">
-        <Search :size="18" class="absolute left-4 top-1/2 -translate-y-1/2" style="color: var(--color-text-muted)" />
-        <input
-          v-model="searchText"
-          type="search"
-          placeholder="Search your alerts by keyword or location..."
-          class="w-full rounded-2xl border bg-[var(--color-surface)] py-3 pl-11 pr-4 text-sm outline-none transition focus:border-primary"
-          style="border-color: var(--color-border); color: var(--color-text)"
-        />
-      </div>
+      <template v-if="loading">
+        <Skeleton variant="card" height="10rem" />
+        <Skeleton variant="card" height="14rem" />
+      </template>
 
-      <PageHeader title="Job Alerts" description="Get notified when new jobs matching your criteria are posted.">
-        <template #actions>
-          <AppButton @click="createOpen = true">
-            <Plus :size="16" /> Create New Alert
-          </AppButton>
-        </template>
-      </PageHeader>
-
-      <div class="space-y-4">
-        <template v-if="loading">
-          <Skeleton v-for="i in 3" :key="i" variant="card" height="6rem" />
-        </template>
-
-        <EmptyState
-          v-else-if="!filteredAlerts.length"
-          :icon="Bell"
-          title="No job alerts yet"
-          description="Create an alert and we'll notify you when matching jobs are posted."
-          action-label="Create New Alert"
-          @action="createOpen = true"
-        />
-
-        <article
-          v-for="alert in filteredAlerts"
-          v-else
-          :key="alert.id"
-          class="card-surface p-5"
-        >
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex items-start gap-4 min-w-0">
-              <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary dark:bg-white/10">
-                <Bell :size="22" />
+      <template v-else>
+        <!-- Preferences -->
+        <section class="card-surface space-y-5 p-5">
+          <div class="flex items-center justify-between gap-4 border-b pb-4" style="border-color: var(--color-border)">
+            <div class="flex items-center gap-3">
+              <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary dark:bg-white/10">
+                <Bell :size="20" />
               </div>
-
-              <div class="min-w-0">
-                <div class="flex items-center gap-3 flex-wrap">
-                  <h3 class="text-sm font-bold" style="color: var(--color-text)">{{ alert.keyword }}</h3>
-                  <span
-                    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
-                    :class="alert.active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'"
-                  >
-                    {{ alert.active ? 'Active' : 'Inactive' }}
-                  </span>
-                </div>
-                <p class="mt-1.5 flex items-center gap-1.5 text-xs" style="color: var(--color-text-muted)">
-                  <MapPin :size="13" /> {{ alert.location }}
-                </p>
-                <p class="mt-2 text-xs" style="color: var(--color-text-muted)">
-                  Email me when new jobs matching "{{ alert.keyword }}" in {{ alert.location }} are posted.
+              <div>
+                <p class="text-sm font-bold" style="color: var(--color-text)">Receive job alerts</p>
+                <p class="text-xs" style="color: var(--color-text-muted)">
+                  Get notified when jobs matching your preferences are posted.
                 </p>
               </div>
             </div>
-
-            <div class="flex items-center gap-2">
-              <button
-                type="button"
-                class="rounded-lg p-1.5 text-red-500 transition hover:bg-red-50 dark:hover:bg-red-500/10"
-                aria-label="Delete alert"
-                @click="deleteTarget = alert"
-              >
-                <Trash2 :size="16" />
-              </button>
-            </div>
-          </div>
-
-          <div class="mt-4 flex items-center justify-end border-t pt-4" style="border-color: var(--color-border)">
             <button
               type="button"
-              :disabled="togglingId === alert.id"
-              class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out disabled:opacity-60"
-              :class="alert.active ? 'bg-primary' : 'bg-slate-300 dark:bg-white/20'"
-              @click="toggleAlertStatus(alert.id)"
+              class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
+              :class="receiveJobAlerts ? 'bg-primary' : 'bg-slate-300 dark:bg-white/20'"
+              @click="receiveJobAlerts = !receiveJobAlerts"
             >
               <span
                 class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
-                :class="alert.active ? 'translate-x-5' : 'translate-x-0'"
+                :class="receiveJobAlerts ? 'translate-x-5' : 'translate-x-0'"
               />
             </button>
           </div>
-        </article>
-      </div>
+
+          <div class="grid gap-5 sm:grid-cols-3">
+            <div>
+              <p class="mb-2 text-xs font-semibold" style="color: var(--color-text)">Categories</p>
+              <div class="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                <label v-for="cat in categories" :key="cat.id" class="flex cursor-pointer items-center gap-2 text-xs" style="color: var(--color-text-muted)">
+                  <input type="checkbox" class="accent-primary" :checked="categoryIds.includes(cat.id)" @change="toggleId(categoryIds, cat.id)" />
+                  {{ cat.nameEn }}
+                </label>
+                <p v-if="!categories.length" class="text-xs" style="color: var(--color-text-muted)">No categories available.</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="mb-2 text-xs font-semibold" style="color: var(--color-text)">Regions</p>
+              <div class="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                <label v-for="region in regions" :key="region.id" class="flex cursor-pointer items-center gap-2 text-xs" style="color: var(--color-text-muted)">
+                  <input type="checkbox" class="accent-primary" :checked="regionIds.includes(region.id)" @change="toggleId(regionIds, region.id)" />
+                  {{ region.nameEn }}
+                </label>
+                <p v-if="!regions.length" class="text-xs" style="color: var(--color-text-muted)">No regions available.</p>
+              </div>
+            </div>
+
+            <div>
+              <p class="mb-2 text-xs font-semibold" style="color: var(--color-text)">Employment types</p>
+              <div class="max-h-40 space-y-1.5 overflow-y-auto pr-1">
+                <label v-for="type in employmentTypes" :key="type.id" class="flex cursor-pointer items-center gap-2 text-xs" style="color: var(--color-text-muted)">
+                  <input type="checkbox" class="accent-primary" :checked="employmentTypeIds.includes(type.id)" @change="toggleId(employmentTypeIds, type.id)" />
+                  {{ type.nameEn }}
+                </label>
+                <p v-if="!employmentTypes.length" class="text-xs" style="color: var(--color-text-muted)">No employment types available.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end border-t pt-4" style="border-color: var(--color-border)">
+            <AppButton :loading="saving" @click="savePreferences">Save preferences</AppButton>
+          </div>
+        </section>
+
+        <!-- Matches -->
+        <section class="space-y-3">
+          <h2 class="text-sm font-bold" style="color: var(--color-text)">Matching jobs</h2>
+
+          <template v-if="matchesLoading">
+            <Skeleton v-for="i in 2" :key="i" variant="card" height="5rem" />
+          </template>
+
+          <EmptyState
+            v-else-if="!matches.length"
+            :icon="Bell"
+            title="No matches yet"
+            description="No jobs match your alert preferences yet."
+          />
+
+          <RouterLink
+            v-for="job in matches"
+            v-else
+            :key="job.id"
+            :to="`/dashboard/apply/${job.id}`"
+            class="card-surface card-hover flex items-center gap-4 p-4"
+          >
+            <div
+              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-sm font-extrabold"
+              :style="{ backgroundColor: (job.brandColor || '#FD5C20') + '1a', color: job.brandColor || '#FD5C20' }"
+            >
+              {{ job.initials }}
+            </div>
+            <div class="min-w-0 flex-1">
+              <h3 class="truncate text-sm font-bold" style="color: var(--color-text)">{{ job.title }}</h3>
+              <p class="text-xs font-semibold" style="color: var(--color-text-muted)">{{ job.company }}</p>
+              <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px]" style="color: var(--color-text-muted)">
+                <span class="inline-flex items-center gap-1"><MapPin :size="12" /> {{ job.location }}</span>
+                <span class="inline-flex items-center gap-1"><BriefcaseBusiness :size="12" /> {{ job.type }}</span>
+                <span v-if="job.salaryDisplay">{{ job.salaryDisplay }}</span>
+              </div>
+            </div>
+          </RouterLink>
+        </section>
+      </template>
     </div>
-
-    <AppModal :open="createOpen" title="Create job alert" size="sm" @close="createOpen = false">
-      <form class="space-y-4" @submit.prevent="createAlert">
-        <AppInput v-model="newKeyword" label="Keyword or job title" placeholder="e.g. Frontend Developer" required />
-        <AppInput v-model="newLocation" label="Location" placeholder="e.g. Dar es Salaam (optional)" />
-        <AppButton type="submit" block :loading="creating">Create alert</AppButton>
-      </form>
-    </AppModal>
-
-    <ConfirmDialog
-      :open="!!deleteTarget"
-      title="Delete this job alert?"
-      :description="deleteTarget ? `You'll stop getting notified about '${deleteTarget.keyword}' jobs.` : ''"
-      confirm-label="Delete"
-      :loading="deleting"
-      @confirm="confirmDelete"
-      @close="deleteTarget = null"
-    />
   </DashboardLayout>
 </template>

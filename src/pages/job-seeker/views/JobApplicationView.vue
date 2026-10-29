@@ -38,6 +38,7 @@ const job = ref(null)
 const form = ref({
   coverLetter: '',
 })
+const requirementsConfirmed = ref(false)
 
 const savedCVs = ref([])
 const loadingCvs = ref(true)
@@ -106,6 +107,10 @@ async function submitApplication() {
     errorMessage.value = 'Please write a short cover letter before submitting.'
     return
   }
+  if (!requirementsConfirmed.value) {
+    errorMessage.value = 'Please confirm that you meet the requirements for this role.'
+    return
+  }
 
   submitting.value = true
   try {
@@ -113,6 +118,7 @@ async function submitApplication() {
       jobId,
       cvId: selectedCv.value.id,
       coverLetter: form.value.coverLetter,
+      requirementsConfirmed: requirementsConfirmed.value,
     })
     router.push({
       path: '/dashboard/application-success',
@@ -273,6 +279,16 @@ async function submitApplication() {
 
             </div>
 
+            <!-- Requirements confirmation -->
+            <label class="flex items-start gap-2.5 text-xs text-slate-700">
+              <input
+                v-model="requirementsConfirmed"
+                type="checkbox"
+                class="mt-0.5 h-4 w-4 shrink-0 accent-orange-600"
+              />
+              <span>I confirm that I meet the requirements and qualifications for this role.</span>
+            </label>
+
             <!-- Submission error -->
             <div
               v-if="errorMessage"
@@ -353,7 +369,10 @@ async function submitApplication() {
               </div>
 
               <p class="mt-3 text-xs font-bold text-slate-900">
-                {{ job.salaryCurrency }} {{ job.salaryMin.toLocaleString() }} - {{ job.salaryMax.toLocaleString() }} / month
+                <template v-if="job.salaryMin != null && job.salaryMax != null">
+                  {{ job.salaryCurrency }} {{ job.salaryMin.toLocaleString() }} - {{ job.salaryMax.toLocaleString() }} / month
+                </template>
+                <template v-else>Salary not disclosed</template>
               </p>
             </div>
 

@@ -35,18 +35,19 @@ const saving = ref(false)
 const loadingExisting = ref(!!existingCvId)
 const formError = ref('')
 
-const selectedTemplate = computed(() => {
-  const queryId = Number(route.query.template)
-  return [1, 2, 3, 4, 5].includes(queryId) ? queryId : 1
-})
-
-const templateName = computed(() => ({
-  1: 'Professional',
-  2: 'Modern',
-  3: 'Minimal',
-  4: 'Creative',
-  5: 'Simple',
-}[selectedTemplate.value]))
+// Real template ids come from the backend and aren't guaranteed to be 1-5 in this order, so the
+// 5 hand-built preview layouts below are picked by each template's `preview` key (set in
+// src/api/cv.js from the real template code), not by a hardcoded numeric id.
+const templates = ref([])
+const existingTemplateId = ref(null)
+const selectedTemplateId = computed(
+  () => Number(route.query.template) || existingTemplateId.value || templates.value[0]?.id || null,
+)
+const selectedTemplate = computed(
+  () => templates.value.find((t) => t.id === selectedTemplateId.value) ?? templates.value[0] ?? null,
+)
+const previewKey = computed(() => selectedTemplate.value?.preview ?? 'simple')
+const templateName = computed(() => selectedTemplate.value?.name ?? 'CV')
 
 const form = ref({
   fullName: '',
@@ -141,6 +142,7 @@ const removeSkill = skill => {
 
 function hydrateFrom(record) {
   cvName.value = record.cvName || ''
+  existingTemplateId.value = record.templateId || null
   form.value = {
     fullName: record.fullName || '',
     email: record.email || '',
@@ -157,6 +159,7 @@ function hydrateFrom(record) {
 
 onMounted(async () => {
   try {
+    templates.value = await cvApi.listTemplates()
     if (cvId.value) {
       const existing = await cvApi.getCv(cvId.value)
       hydrateFrom(existing)
@@ -179,7 +182,7 @@ async function saveCv() {
   try {
     const payload = {
       cvName: cvName.value.trim() || `${form.value.professionalTitle || 'Untitled'} CV`,
-      templateId: selectedTemplate.value,
+      templateId: selectedTemplateId.value,
       headline: form.value.professionalTitle,
       summary: form.value.summary,
       fullName: form.value.fullName,
@@ -601,7 +604,7 @@ const downloadPdf = () => window.print()
           </div>
 
           <!-- TEMPLATE 1: PROFESSIONAL -->
-          <article v-if="selectedTemplate === 1" class="cv-paper cv-professional">
+          <article v-if="previewKey === 'professional'" class="cv-paper cv-professional">
             <header class="professional-header">
               <h1>{{ form.fullName || 'Your Name' }}</h1>
               <p>{{ form.professionalTitle || 'Professional Title' }}</p>
@@ -654,7 +657,7 @@ const downloadPdf = () => window.print()
           </article>
 
           <!-- TEMPLATE 2: MODERN -->
-          <article v-else-if="selectedTemplate === 2" class="cv-paper cv-modern">
+          <article v-else-if="previewKey === 'modern'" class="cv-paper cv-modern">
             <div class="modern-body">
               <aside class="modern-sidebar">
                 <div class="cv-photo cv-photo-round modern-photo">
@@ -709,7 +712,7 @@ const downloadPdf = () => window.print()
           </article>
 
           <!-- TEMPLATE 3: MINIMAL -->
-          <article v-else-if="selectedTemplate === 3" class="cv-paper cv-minimal">
+          <article v-else-if="previewKey === 'minimal'" class="cv-paper cv-minimal">
             <header class="minimal-header">
               <div class="cv-photo minimal-photo">
                 <img v-if="form.photo" :src="form.photo" alt="Profile" />
@@ -759,7 +762,7 @@ const downloadPdf = () => window.print()
           </article>
 
           <!-- TEMPLATE 4: CREATIVE -->
-          <article v-else-if="selectedTemplate === 4" class="cv-paper cv-creative">
+          <article v-else-if="previewKey === 'creative'" class="cv-paper cv-creative">
             <header class="creative-header">
               <div class="cv-photo creative-photo">
                 <img v-if="form.photo" :src="form.photo" alt="Profile" />

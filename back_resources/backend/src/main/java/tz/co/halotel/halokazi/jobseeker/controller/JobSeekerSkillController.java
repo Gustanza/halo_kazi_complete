@@ -4,7 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tz.co.halotel.halokazi.common.dto.ApiResponse;
 import tz.co.halotel.halokazi.jobseeker.model.ProfileSkill;
-import tz.co.halotel.halokazi.jobseeker.repository.JobSeekerDataStore;
+import tz.co.halotel.halokazi.jobseeker.service.CurrentJobSeekerProvider;
 import tz.co.halotel.halokazi.jobseeker.service.SkillService;
 
 import java.util.List;
@@ -14,33 +14,27 @@ import java.util.List;
 public class JobSeekerSkillController {
 
     private final SkillService skillService;
+    private final CurrentJobSeekerProvider currentJobSeeker;
 
-    public JobSeekerSkillController(SkillService skillService) {
+    public JobSeekerSkillController(SkillService skillService, CurrentJobSeekerProvider currentJobSeeker) {
         this.skillService = skillService;
+        this.currentJobSeeker = currentJobSeeker;
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ProfileSkill>>> getSkills(
-            @RequestParam(required = false) Long profileId) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        return ResponseEntity.ok(ApiResponse.success(skillService.getSkills(targetId)));
+    public ResponseEntity<ApiResponse<List<ProfileSkill>>> getSkills() {
+        return ResponseEntity.ok(ApiResponse.success(skillService.getSkills(currentJobSeeker.getCurrentProfileId())));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<ProfileSkill>> addSkill(
-            @RequestParam(required = false) Long profileId,
-            @RequestBody ProfileSkill skill) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        ProfileSkill saved = skillService.saveSkill(targetId, skill);
+    public ResponseEntity<ApiResponse<ProfileSkill>> addSkill(@RequestBody ProfileSkill skill) {
+        ProfileSkill saved = skillService.saveSkill(currentJobSeeker.getCurrentProfileId(), skill);
         return ResponseEntity.ok(ApiResponse.success("Skill added successfully", saved));
     }
 
     @DeleteMapping("/{skillId}")
-    public ResponseEntity<ApiResponse<Void>> deleteSkill(
-            @PathVariable Long skillId,
-            @RequestParam(required = false) Long profileId) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        boolean deleted = skillService.deleteSkill(targetId, skillId);
+    public ResponseEntity<ApiResponse<Void>> deleteSkill(@PathVariable Long skillId) {
+        boolean deleted = skillService.deleteSkill(currentJobSeeker.getCurrentProfileId(), skillId);
         if (!deleted) {
             return ResponseEntity.notFound().build();
         }

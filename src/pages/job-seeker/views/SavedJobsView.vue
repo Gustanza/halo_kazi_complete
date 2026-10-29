@@ -28,7 +28,7 @@ async function load() {
     const result = await jobsApi.listJobs({ savedOnly: true, search: searchText.value, pageSize: 100 })
     let items = result.items
     if (sortBy.value === 'oldest') items = [...items].reverse()
-    else if (sortBy.value === 'salary') items = [...items].sort((a, b) => b.salaryMax - a.salaryMax)
+    else if (sortBy.value === 'salary') items = [...items].sort((a, b) => (b.salaryMax ?? 0) - (a.salaryMax ?? 0))
     jobs.value = items
 
     const appliedChecks = await Promise.all(items.map((job) => applicationsApi.hasAppliedTo(job.id)))
@@ -202,10 +202,11 @@ onMounted(load)
 
               <!-- Salary Below Status -->
               <div>
-                <p class="text-xs font-bold text-gray-900">
+                <p v-if="job.salaryMin != null && job.salaryMax != null" class="text-xs font-bold text-gray-900">
                   {{ job.salaryCurrency }} {{ job.salaryMin.toLocaleString() }} - {{ job.salaryMax.toLocaleString() }}
                   <span class="font-normal text-gray-500">/ month</span>
                 </p>
+                <p v-else class="text-xs font-semibold text-gray-400">Salary not disclosed</p>
               </div>
 
               <!-- Action Button -->

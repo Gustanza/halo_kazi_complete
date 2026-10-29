@@ -4,7 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import tz.co.halotel.halokazi.common.dto.ApiResponse;
 import tz.co.halotel.halokazi.jobseeker.model.ProfileProject;
-import tz.co.halotel.halokazi.jobseeker.repository.JobSeekerDataStore;
+import tz.co.halotel.halokazi.jobseeker.service.CurrentJobSeekerProvider;
 import tz.co.halotel.halokazi.jobseeker.service.ProjectService;
 
 import java.util.List;
@@ -14,33 +14,27 @@ import java.util.List;
 public class JobSeekerProjectController {
 
     private final ProjectService projectService;
+    private final CurrentJobSeekerProvider currentJobSeeker;
 
-    public JobSeekerProjectController(ProjectService projectService) {
+    public JobSeekerProjectController(ProjectService projectService, CurrentJobSeekerProvider currentJobSeeker) {
         this.projectService = projectService;
+        this.currentJobSeeker = currentJobSeeker;
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ProfileProject>>> getProjects(
-            @RequestParam(required = false) Long profileId) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        return ResponseEntity.ok(ApiResponse.success(projectService.getProjects(targetId)));
+    public ResponseEntity<ApiResponse<List<ProfileProject>>> getProjects() {
+        return ResponseEntity.ok(ApiResponse.success(projectService.getProjects(currentJobSeeker.getCurrentProfileId())));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<ProfileProject>> addProject(
-            @RequestParam(required = false) Long profileId,
-            @RequestBody ProfileProject project) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        ProfileProject saved = projectService.saveProject(targetId, project);
+    public ResponseEntity<ApiResponse<ProfileProject>> addProject(@RequestBody ProfileProject project) {
+        ProfileProject saved = projectService.saveProject(currentJobSeeker.getCurrentProfileId(), project);
         return ResponseEntity.ok(ApiResponse.success("Project added successfully", saved));
     }
 
     @DeleteMapping("/{projectId}")
-    public ResponseEntity<ApiResponse<Void>> deleteProject(
-            @PathVariable Long projectId,
-            @RequestParam(required = false) Long profileId) {
-        Long targetId = profileId != null ? profileId : JobSeekerDataStore.DEFAULT_PROFILE_ID;
-        boolean deleted = projectService.deleteProject(targetId, projectId);
+    public ResponseEntity<ApiResponse<Void>> deleteProject(@PathVariable Long projectId) {
+        boolean deleted = projectService.deleteProject(currentJobSeeker.getCurrentProfileId(), projectId);
         if (!deleted) {
             return ResponseEntity.notFound().build();
         }

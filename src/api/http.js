@@ -53,9 +53,12 @@ function buildUrl(path, params) {
   return `${BASE_URL}${path}${qs ? `?${qs}` : ''}`
 }
 
-/** auth: true sends the session token and treats a 401 (or ACCOUNT_DISABLED) as "logged out". */
-export async function request(method, path, { params, body, signal, auth = false } = {}) {
-  const headers = { Accept: 'application/json' }
+/**
+ * auth: true sends the session token and treats a 401 (or ACCOUNT_DISABLED) as "logged out".
+ * raw: true skips JSON parsing and resolves with the fetch Response itself (binary downloads).
+ */
+export async function request(method, path, { params, body, signal, auth = false, headers: extraHeaders, raw = false } = {}) {
+  const headers = { Accept: 'application/json', ...extraHeaders }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   const token = auth ? tokenProvider() : null
   if (token) headers.Authorization = `Bearer ${token}`
@@ -73,14 +76,15 @@ export async function request(method, path, { params, body, signal, auth = false
     throw new ApiError(0, { message: 'Could not reach the server. Is the backend running?' })
   }
 
-  if (response.status === 204) return null
-  const data = await response.json().catch(() => null)
   if (!response.ok) {
+    const data = await response.json().catch(() => null)
     const error = new ApiError(response.status, data)
     if (auth && (response.status === 401 || error.code === 'ACCOUNT_DISABLED')) unauthorizedHandler(error)
     throw error
   }
-  return data
+  if (raw) return response
+  if (response.status === 204) return null
+  return response.json().catch(() => null)
 }
 
 export const getJson = (path, options) => request('GET', path, options)
