@@ -74,13 +74,6 @@ const privacyItems = [
   { key: 'showPhone', title: 'Display phone number', desc: 'Allow employers to see your phone number.' }
 ]
 
-const quickLinks = [
-  { title: 'View My Profile', desc: 'See how employers see you', icon: UserRound, route: '/profile' },
-  { title: 'Manage CVs', desc: 'Upload and manage your CVs', icon: FileText, route: '/my-cvs' },
-  { title: 'Saved Jobs', desc: "Jobs you've saved", icon: Bookmark, route: '/saved-jobs' },
-  { title: 'Applications', desc: 'Track your job applications', icon: BriefcaseBusiness, route: '/applications' }
-]
-
 const sectionTitle = computed(() =>
   sections.find(item => item.id === activeSection.value)?.label || 'Settings'
 )
@@ -153,7 +146,7 @@ function openQuickLink(link) {
       </header>
 
       <!-- Main page columns -->
-      <div class="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[185px_minmax(0,1fr)_250px]">
+      <div class="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[185px_minmax(0,1fr)]">
 
         <!-- Settings navigation -->
         <aside class="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -220,7 +213,7 @@ function openQuickLink(link) {
             </div>
 
             <button
-              v-if="['account', 'language', 'appearance'].includes(activeSection)"
+              v-if="['language', 'appearance'].includes(activeSection)"
               type="button"
               class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-orange-700"
               @click="saveChanges"
@@ -243,18 +236,15 @@ function openQuickLink(link) {
           </div>
 
           <!-- ACCOUNT INFORMATION -->
-          <form
-            v-if="activeSection === 'account'"
-            class="space-y-6"
-            @submit.prevent="saveChanges"
-          >
+          <div v-if="activeSection === 'account'" class="space-y-6">
+
             <!-- Profile photo -->
             <div class="flex flex-wrap items-center gap-4">
               <div class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-4 border-slate-50 bg-slate-100">
                 <img
                   v-if="photoPreview"
                   :src="photoPreview"
-                  alt="Profile preview"
+                  alt="Profile"
                   class="h-full w-full object-cover"
                 />
                 <UserRound v-else :size="34" class="text-slate-400" />
@@ -262,133 +252,79 @@ function openQuickLink(link) {
 
               <div class="min-w-0">
                 <p class="text-sm font-semibold text-slate-800">Profile Photo</p>
-                <p class="mt-1 text-xs text-slate-500">Upload a professional photo.</p>
-
-                <label class="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50">
-                  <Camera :size="15" />
-                  Change Photo
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    class="hidden"
-                    @change="uploadPhoto"
-                  />
-                </label>
-
-                <p class="mt-1.5 text-[10px] text-slate-400">JPG or PNG, maximum 2MB.</p>
+                <p class="mt-1 text-xs text-slate-500">
+                  Your account profile photo.
+                </p>
               </div>
             </div>
 
             <!-- Personal details -->
             <div>
-              <h3 class="mb-4 text-sm font-bold text-slate-800">Personal Information</h3>
+              <h3 class="mb-4 text-sm font-bold text-slate-800">
+                Personal Information
+              </h3>
 
               <div class="grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2">
-                <label class="block text-xs font-semibold text-slate-700">
-                  Full Name <span class="text-red-500">*</span>
-                  <input
-                    v-model="account.fullName"
-                    type="text"
-                    required
-                    autocomplete="name"
-                    class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-normal outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-50"
-                  />
-                </label>
+                <div>
+                  <p class="text-xs font-semibold text-slate-500">Full Name</p>
+                  <p class="mt-2 break-words text-sm font-medium text-slate-800">
+                    {{ account.fullName }}
+                  </p>
+                </div>
 
-                <label class="block text-xs font-semibold text-slate-700">
-                  Email Address <span class="text-red-500">*</span>
-                  <input
-                    v-model="account.email"
-                    type="email"
-                    required
-                    autocomplete="email"
-                    class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-normal outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-50"
-                  />
-                </label>
+                <div>
+                  <p class="text-xs font-semibold text-slate-500">Email Address</p>
+                  <p class="mt-2 break-words text-sm font-medium text-slate-800">
+                    {{ account.email }}
+                  </p>
+                </div>
 
-                <label class="block text-xs font-semibold text-slate-700">
-                  Phone Number <span class="text-red-500">*</span>
-                  <input
-                    v-model="account.phone"
-                    type="tel"
-                    required
-                    autocomplete="tel"
-                    class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-normal outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-50"
-                  />
-                </label>
+                <div>
+                  <p class="text-xs font-semibold text-slate-500">Phone Number</p>
+                  <p class="mt-2 text-sm font-medium text-slate-800">
+                    {{ account.phone }}
+                  </p>
+                </div>
 
-                <label class="block text-xs font-semibold text-slate-700">
-                  Date of Birth
-                  <input
-                    v-model="account.dateOfBirth"
-                    type="date"
-                    class="mt-2 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-normal outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-50"
-                  />
-                </label>
+                <div>
+                  <p class="text-xs font-semibold text-slate-500">Date of Birth</p>
+                  <p class="mt-2 text-sm font-medium text-slate-800">
+                    {{ account.dateOfBirth }}
+                  </p>
+                </div>
 
-                <label class="block text-xs font-semibold text-slate-700">
-                  Gender
-                  <select
-                    v-model="account.gender"
-                    class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-normal outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-50"
-                  >
-                    <option>Female</option>
-                    <option>Male</option>
-                    <option>Prefer not to say</option>
-                  </select>
-                </label>
+                <div>
+                  <p class="text-xs font-semibold text-slate-500">Gender</p>
+                  <p class="mt-2 text-sm font-medium text-slate-800">
+                    {{ account.gender }}
+                  </p>
+                </div>
 
-                <label class="block text-xs font-semibold text-slate-700">
-                  Location
-                  <span class="relative mt-2 block">
-                    <MapPin :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      v-model="account.location"
-                      type="text"
-                      class="w-full rounded-lg border border-slate-200 py-3 pl-9 pr-3 text-sm font-normal outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-50"
-                    />
-                  </span>
-                </label>
+                <div>
+                  <p class="text-xs font-semibold text-slate-500">Location</p>
+                  <p class="mt-2 break-words text-sm font-medium text-slate-800">
+                    {{ account.location }}
+                  </p>
+                </div>
               </div>
             </div>
 
             <!-- About -->
             <div>
-              <div class="mb-2">
-                <h3 class="text-sm font-bold text-slate-800">About Me</h3>
-                <p class="mt-1 text-xs text-slate-500">
-                  Tell employers about your experience and skills.
-                </p>
-              </div>
-
-              <textarea
-                v-model="account.about"
-                rows="5"
-                maxlength="500"
-                class="w-full resize-y rounded-lg border border-slate-200 px-4 py-3 text-sm leading-6 outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-50"
-                placeholder="Write a short professional introduction..."
-              ></textarea>
-
+              <h3 class="text-sm font-bold text-slate-800">About Me</h3>
+              <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">
+                {{ account.about }}
+              </p>
               <p class="mt-1 text-right text-[11px] text-slate-400">
                 {{ aboutCount }}/500
               </p>
             </div>
-
-            <div class="flex justify-end border-t border-slate-100 pt-5">
-              <button
-                type="submit"
-                class="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white transition hover:bg-orange-700"
-              >
-                <Save :size="15" />
-                Save Changes
-              </button>
-            </div>
-          </form>
+          </div>
 
           <!-- CHANGE PASSWORD -->
           <form
             v-else-if="activeSection === 'password'"
-            class="max-w-lg space-y-5"
+            class="w-full space-y-5"
             @submit.prevent="saveChanges"
           >
             <label class="block text-xs font-semibold text-slate-700">
@@ -671,112 +607,6 @@ function openQuickLink(link) {
             </p>
           </div>
         </main>
-
-        <!-- RIGHT SIDEBAR -->
-        <aside class="min-w-0 space-y-5">
-
-          <!-- Profile Completion -->
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 class="flex items-center gap-2 text-sm font-bold text-slate-800">
-              <SettingsIcon :size="17" class="text-slate-500" />
-              Profile Completion
-            </h3>
-
-            <div class="mt-5 flex items-center gap-4">
-              <div
-                class="relative flex h-[82px] w-[82px] shrink-0 items-center justify-center rounded-full"
-                style="background: conic-gradient(#36b879 0deg 306deg, #e5e7eb 306deg 360deg)"
-              >
-                <div class="flex h-[66px] w-[66px] items-center justify-center rounded-full bg-white text-lg font-bold text-slate-800">
-                  85%
-                </div>
-              </div>
-
-              <div class="min-w-0">
-                <p class="mb-3 text-xs leading-5 text-slate-600">
-                  Your profile is almost complete!
-                </p>
-
-                <p class="mb-2 flex items-center gap-2 text-[11px] text-slate-600">
-                  <CheckCircle2 :size="14" class="shrink-0 text-emerald-500" />
-                  Basic Information
-                </p>
-                <p class="mb-2 flex items-center gap-2 text-[11px] text-slate-600">
-                  <CheckCircle2 :size="14" class="shrink-0 text-emerald-500" />
-                  Education
-                </p>
-                <p class="mb-2 flex items-center gap-2 text-[11px] text-slate-600">
-                  <CheckCircle2 :size="14" class="shrink-0 text-emerald-500" />
-                  Work Experience
-                </p>
-                <p class="mb-2 flex items-center gap-2 text-[11px] text-slate-600">
-                  <CheckCircle2 :size="14" class="shrink-0 text-emerald-500" />
-                  Skills
-                </p>
-                <p class="flex items-center gap-2 text-[11px] text-slate-500">
-                  <Circle :size="14" class="shrink-0 text-slate-400" />
-                  Profile Photo
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <!-- Quick Links -->
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 class="mb-2 flex items-center gap-2 text-sm font-bold text-slate-800">
-              <SettingsIcon :size="17" class="text-slate-500" />
-              Quick Links
-            </h3>
-
-            <button
-              v-for="link in quickLinks"
-              :key="link.title"
-              type="button"
-              class="flex w-full items-center gap-3 border-b border-slate-100 py-4 text-left last:border-b-0 last:pb-0"
-              @click="openQuickLink(link)"
-            >
-              <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-slate-700">
-                <component :is="link.icon" :size="19" />
-              </span>
-
-              <span class="min-w-0 flex-1">
-                <span class="block text-xs font-semibold text-slate-800">
-                  {{ link.title }}
-                </span>
-                <span class="mt-1 block text-[10px] leading-4 text-slate-500">
-                  {{ link.desc }}
-                </span>
-              </span>
-
-              <ChevronRight :size="16" class="shrink-0 text-slate-400" />
-            </button>
-          </section>
-
-          <!-- Support -->
-          <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div class="flex items-start gap-3">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-orange-600">
-                <Headset :size="22" />
-              </div>
-
-              <div class="min-w-0">
-                <h3 class="text-sm font-bold text-slate-800">Need Help?</h3>
-                <p class="mt-1 text-xs leading-5 text-slate-500">
-                  Our support team is here to help you.
-                </p>
-              </div>
-            </div>
-
-            <a
-              href="mailto:support@halokazi.co.tz"
-              class="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-3 text-xs font-semibold text-slate-700 transition hover:border-orange-300 hover:bg-orange-50"
-            >
-              <Headset :size="15" />
-              Contact Support
-            </a>
-          </section>
-        </aside>
-
       </div>
     </div>
   </DashboardLayout>

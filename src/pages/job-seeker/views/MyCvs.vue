@@ -3,9 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
 import {
-  House, UserRound, BookOpen, BriefcaseBusiness, Bookmark,
-  Download, Eye, Send, Bell, Moon, ChevronDown, MoreVertical,
-  Search, Settings, FileText, Plus, Save, X
+  FileText, MoreVertical, Eye, Download,
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -24,36 +22,51 @@ const cvs = ref([
     status: 'Active',
     default: true,
     theme: 'professional',
+    templateId: 1,
   },
   {
     id: 2,
-    title: 'Creative CV',
-    description: 'Clean and modern design with a creative touch. Great for marketing and design roles.',
+    title: 'Modern CV',
+    description: 'Modern layout with a bold orange accent.',
     created: '5 Mar 2025',
     updated: '1 week ago',
     status: 'Active',
     default: false,
-    theme: 'creative',
+    theme: 'modern',
+    templateId: 2,
   },
   {
     id: 3,
     title: 'Minimal CV',
-    description: 'Simple and professional. Perfect for traditional industries and general applications.',
+    description: 'Simple, clean, and professional single-column layout.',
     created: '20 Feb 2025',
     updated: '3 weeks ago',
     status: 'Active',
     default: false,
     theme: 'minimal',
+    templateId: 3,
   },
   {
     id: 4,
-    title: 'Student CV',
-    description: 'Simple and clean CV designed for internship and entry-level positions.',
+    title: 'Creative CV',
+    description: 'Creative layout with a distinctive purple accent.',
     created: '10 Jan 2025',
     updated: '2 months ago',
     status: 'Active',
     default: false,
-    theme: 'student',
+    theme: 'creative',
+    templateId: 4,
+  },
+  {
+    id: 5,
+    title: 'Simple CV',
+    description: 'A straightforward single-column CV with a dark top border.',
+    created: '8 Jan 2025',
+    updated: '2 months ago',
+    status: 'Active',
+    default: false,
+    theme: 'simple',
+    templateId: 5,
   },
 ])
 
@@ -101,7 +114,10 @@ function setDefault(cv) {
 function viewCv(cv) {
   router.push({
     path: '/dashboard/view-cv',
-    query: { cv: cv.id },
+    query: {
+      cv: cv.id,
+      template: cv.templateId,
+    },
   })
 }
 </script>
@@ -162,70 +178,73 @@ function viewCv(cv) {
             class="flex h-32 w-28 shrink-0 self-start overflow-hidden rounded-md border border-slate-100 bg-slate-50 p-1"
           >
             <div
-              class="flex h-full w-full overflow-hidden rounded-sm"
-              :class="{
-                'bg-white': cv.theme === 'professional',
-                'bg-slate-800': cv.theme === 'creative',
-                'bg-slate-100': cv.theme === 'minimal',
-                'bg-violet-50': cv.theme === 'student',
-              }"
+              class="relative flex h-full w-full overflow-hidden rounded-sm bg-white"
             >
-              <div
-                class="w-[34%] p-1"
-                :class="{
-                  'bg-blue-50': cv.theme === 'professional',
-                  'bg-slate-700': cv.theme === 'creative',
-                  'bg-slate-800': cv.theme === 'minimal',
-                  'bg-violet-100': cv.theme === 'student',
-                }"
-              >
-                <div
-                  class="mx-auto mb-2 h-5 w-5 rounded-full"
-                  :class="{
-                    'bg-blue-200': cv.theme === 'professional',
-                    'bg-slate-400': cv.theme === 'creative',
-                    'bg-slate-500': cv.theme === 'minimal',
-                    'bg-violet-300': cv.theme === 'student',
-                  }"
-                ></div>
-                <div
-                  v-for="n in 5"
-                  :key="n"
-                  class="mb-1 h-1 rounded"
-                  :class="{
-                    'bg-blue-200': cv.theme === 'professional',
-                    'bg-slate-500': cv.theme === 'creative',
-                    'bg-slate-400': cv.theme === 'minimal',
-                    'bg-violet-300': cv.theme === 'student',
-                  }"
-                ></div>
-              </div>
+              <!-- Professional: blue sidebar -->
+              <template v-if="cv.theme === 'professional'">
+                <div class="w-[34%] bg-blue-100 p-1">
+                  <div class="mx-auto mb-2 h-5 w-5 rounded-full bg-blue-300"></div>
+                  <div v-for="n in 6" :key="n" class="mb-1 h-1 rounded bg-blue-300"></div>
+                </div>
+                <div class="flex-1 p-1.5">
+                  <div class="mb-1 h-2 w-4/5 rounded-sm bg-blue-800"></div>
+                  <div v-for="n in 3" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                  <div class="mb-1 mt-3 h-1.5 w-3/5 bg-blue-300"></div>
+                  <div v-for="n in 7" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                </div>
+              </template>
 
-              <div class="flex-1 p-1.5">
-                <div
-                  class="mb-1 h-2 w-4/5 rounded-sm"
-                  :class="cv.theme === 'creative' || cv.theme === 'minimal'
-                    ? 'bg-white'
-                    : 'bg-slate-400'"
-                ></div>
-                <div
-                  v-for="n in 3"
-                  :key="n"
-                  class="mb-1 h-1 w-full rounded-sm"
-                  :class="cv.theme === 'creative' || cv.theme === 'minimal'
-                    ? 'bg-slate-400'
-                    : 'bg-slate-200'"
-                ></div>
-                <div class="mb-1 mt-3 h-1.5 w-3/5 rounded-sm bg-orange-200"></div>
-                <div
-                  v-for="n in 7"
-                  :key="n"
-                  class="mb-1 h-1 w-full rounded-sm"
-                  :class="cv.theme === 'creative' || cv.theme === 'minimal'
-                    ? 'bg-slate-400'
-                    : 'bg-slate-200'"
-                ></div>
-              </div>
+              <!-- Modern: orange sidebar -->
+              <template v-else-if="cv.theme === 'modern'">
+                <div class="w-[34%] bg-orange-500 p-1">
+                  <div class="mx-auto mb-2 h-5 w-5 rounded-full bg-orange-200"></div>
+                  <div v-for="n in 6" :key="n" class="mb-1 h-1 rounded bg-orange-100"></div>
+                </div>
+                <div class="flex-1 p-1.5">
+                  <div class="mb-1 h-2 w-4/5 rounded-sm bg-orange-500"></div>
+                  <div v-for="n in 3" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                  <div class="mb-1 mt-3 h-1.5 w-3/5 bg-orange-300"></div>
+                  <div v-for="n in 7" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                </div>
+              </template>
+
+              <!-- Minimal: single column -->
+              <template v-else-if="cv.theme === 'minimal'">
+                <div class="w-full p-2">
+                  <div class="mb-1 h-2 w-4/5 rounded-sm bg-slate-800"></div>
+                  <div class="mb-2 h-1 w-3/5 bg-slate-400"></div>
+                  <div class="mb-1 mt-3 h-1.5 w-2/5 bg-slate-700"></div>
+                  <div v-for="n in 5" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                  <div class="mb-1 mt-3 h-1.5 w-2/5 bg-slate-700"></div>
+                  <div v-for="n in 4" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                </div>
+              </template>
+
+              <!-- Creative: purple sidebar -->
+              <template v-else-if="cv.theme === 'creative'">
+                <div class="w-[34%] bg-violet-800 p-1">
+                  <div class="mx-auto mb-2 h-5 w-5 rounded-full bg-violet-300"></div>
+                  <div v-for="n in 6" :key="n" class="mb-1 h-1 rounded bg-violet-300"></div>
+                </div>
+                <div class="flex-1 p-1.5">
+                  <div class="mb-1 h-2 w-4/5 rounded-sm bg-violet-700"></div>
+                  <div v-for="n in 3" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                  <div class="mb-1 mt-3 h-1.5 w-3/5 bg-violet-400"></div>
+                  <div v-for="n in 7" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                </div>
+              </template>
+
+              <!-- Simple: dark top border, single column -->
+              <template v-else>
+                <div class="w-full border-t-4 border-slate-800 p-2">
+                  <div class="mb-1 h-2 w-4/5 rounded-sm bg-slate-700"></div>
+                  <div class="mb-2 h-1 w-3/5 bg-slate-300"></div>
+                  <div class="mb-1 mt-3 h-1.5 w-2/5 bg-slate-500"></div>
+                  <div v-for="n in 5" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                  <div class="mb-1 mt-3 h-1.5 w-2/5 bg-slate-500"></div>
+                  <div v-for="n in 4" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
+                </div>
+              </template>
             </div>
           </div>
 
@@ -233,12 +252,6 @@ function viewCv(cv) {
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2 pr-6">
               <h2 class="text-base font-bold text-slate-900">{{ cv.title }}</h2>
-              <span
-                v-if="cv.default"
-                class="rounded-full bg-orange-100 px-2 py-1 text-[10px] font-semibold text-orange-600"
-              >
-                Default
-              </span>
             </div>
 
             <p class="mt-2 text-xs text-slate-400">
@@ -262,26 +275,18 @@ function viewCv(cv) {
 
             <!-- Actions -->
             <div class="mt-3 flex flex-wrap items-center justify-start gap-2 sm:justify-end">
-              
-            <button
+              <button
                 @click="viewCv(cv)"
                 class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50"
-            >
+              >
                 <Eye :size="16" /> View
-            </button>
+              </button>
 
               <button
                 @click="useCv(cv)"
                 class="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium hover:bg-slate-50"
               >
                 <Download :size="15" /> Download
-              </button>
-
-              <button
-                @click="useCv(cv)"
-                class="inline-flex items-center gap-2 rounded-lg border border-orange-500 px-3 py-2 text-xs font-semibold text-orange-600 hover:bg-orange-50"
-              >
-                <Send :size="15" /> Use
               </button>
             </div>
           </div>
@@ -309,12 +314,6 @@ function viewCv(cv) {
               v-if="openMenu === cv.id"
               class="absolute right-0 top-8 z-20 w-40 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
             >
-              <button
-                @click="setDefault(cv)"
-                class="block w-full rounded px-3 py-2 text-left text-xs hover:bg-orange-50"
-              >
-                Set as default
-              </button>
               <button
                 @click="toggleStatus(cv)"
                 class="block w-full rounded px-3 py-2 text-left text-xs hover:bg-orange-50"

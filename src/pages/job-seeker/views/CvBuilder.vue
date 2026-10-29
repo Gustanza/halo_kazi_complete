@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Check, Eye, ArrowRight } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
@@ -41,11 +41,22 @@ const templates = [
   },
 ]
 
+onMounted(() => {
+  const savedId = Number(localStorage.getItem('cvSelectedTemplate'))
+
+  selectedTemplate.value =
+    templates.find(template => template.id === savedId) || null
+})
+
 const chooseTemplate = (template) => {
   selectedTemplate.value = template
+  localStorage.setItem('cvSelectedTemplate', template.id)
 }
 
 const useTemplate = (template) => {
+  selectedTemplate.value = template
+  localStorage.setItem('cvSelectedTemplate', template.id)
+
   router.push({
     path: '/dashboard/cv-template',
     query: {
@@ -58,19 +69,16 @@ const useTemplate = (template) => {
 <template>
   <DashboardLayout>
     <div class="space-y-5">
-
       <!-- Header -->
-      <section  class="rounded-2xl border border-orange-200 bg-white px-5 py-4 shadow-sm">
+      <section class="rounded-2xl border border-orange-200 bg-white px-5 py-4 shadow-sm">
         <h1
           class="text-3xl font-extrabold"
           style="color: var(--color-text)"
         >
-          Choose a CV Template
+          CV Builder
         </h1>
 
-        <p
-          class="mt-1 text-sm"
-        >
+        <p class="mt-1 text-sm">
           Choose a professional CV template that matches your career and
           personality. You can customize your information after selecting
           a template.
@@ -79,7 +87,6 @@ const useTemplate = (template) => {
 
       <!-- Templates -->
       <section class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-
         <div
           v-for="template in templates"
           :key="template.id"
@@ -91,7 +98,6 @@ const useTemplate = (template) => {
               : 'border-orange-200'
           "
         >
-
           <!-- Selected -->
           <div
             v-if="selectedTemplate?.id === template.id"
@@ -102,7 +108,6 @@ const useTemplate = (template) => {
 
           <!-- Preview -->
           <div class="relative h-[330px] overflow-hidden bg-slate-100 p-5">
-
             <!-- Professional -->
             <div
               v-if="template.preview === 'professional'"
@@ -236,13 +241,11 @@ const useTemplate = (template) => {
                 <div class="mt-1 h-1.5 w-full rounded bg-slate-200"></div>
               </div>
             </div>
-
           </div>
 
           <!-- Info -->
           <div class="p-4">
             <div class="flex items-start justify-between gap-3">
-
               <div>
                 <h2
                   class="font-bold"
@@ -267,7 +270,6 @@ const useTemplate = (template) => {
               >
                 <Eye :size="17" />
               </button>
-
             </div>
 
             <button
@@ -279,10 +281,8 @@ const useTemplate = (template) => {
               <ArrowRight :size="16" />
             </button>
           </div>
-
         </div>
       </section>
-
     </div>
   </DashboardLayout>
 </template>

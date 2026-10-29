@@ -76,6 +76,12 @@ const routes = [
     meta: { title: 'Applications' },
   },
   {
+    path: '/dashboard/view-application',
+    name: 'view-application',
+    component: () => import('../pages/job-seeker/views/ViewApplication.vue'),
+    meta: { title: 'View Application' },
+  },
+  {
     path: '/dashboard/job-alerts',
     name: 'job-alerts',
     component: () => import('../pages/job-seeker/views/PlaceholderView.vue'),
