@@ -26,12 +26,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Error format for the jobseeker module's controllers only. Everything else is rendered by
+ * Error format for the jobseeker, vacancy, saved-jobs, application and alert module controllers. Everything else is rendered by
  * {@link tz.co.halotel.halokazi.common.error.GlobalExceptionHandler}; the explicit bean name keeps the two apart.
  */
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(name = "jobSeekerExceptionHandler",
-        basePackages = {"tz.co.halotel.halokazi.jobseeker.controller", "tz.co.halotel.halokazi.common.controller"})
+        basePackages = {"tz.co.halotel.halokazi.jobseeker.controller", "tz.co.halotel.halokazi.common.controller",
+                "tz.co.halotel.halokazi.vacancy.controller", "tz.co.halotel.halokazi.saved.controller",
+                "tz.co.halotel.halokazi.application.controller", "tz.co.halotel.halokazi.alert.controller"})
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
@@ -46,6 +48,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNotFound(ResourceNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadRequest(BadRequestException ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -126,6 +133,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneralException(Exception ex) {
+        // Business-rule triggers raise ORA-20xxx: show their text as a 400 instead of a 500.
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            String message = cause.getMessage();
+            int idx = message == null ? -1 : message.indexOf("ORA-20");
+            if (idx >= 0) {
+                int end = message.indexOf('\n', idx);
+                String text = (end > idx ? message.substring(idx, end) : message.substring(idx)).replaceAll("^ORA-\\d+:\\s*", "");
+                return ResponseEntity.badRequest().body(ApiResponse.error(text));
+            }
+        }
         log.error("Unhandled request exception", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("An unexpected error occurred"));

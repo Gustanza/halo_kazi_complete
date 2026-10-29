@@ -19,7 +19,7 @@ import tz.co.halotel.halokazi.session.AuthenticatedUser;
 import tz.co.halotel.halokazi.session.CurrentUser;
 
 /** A job seeker's bookmarked jobs (saved_vacancy). Saving and un-saving are idempotent. */
-@RestController
+@RestController("meSavedJobController")
 @RequestMapping("/api/me/saved-jobs")
 @Transactional
 class SavedJobController {
