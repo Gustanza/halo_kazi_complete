@@ -205,7 +205,7 @@ Table otp_code {
   phone varchar2(20) [not null]
   purpose varchar2(30) [not null, note: 'PHONE_VERIFICATION | PASSWORD_RESET | PHONE_CHANGE']
   code_hash varchar2(255) [not null]
-  expires_at timestamptz [not null, note: '+2 minutes']
+  expires_at timestamptz [not null, note: '+ OTP_TTL_SECONDS (currently 5 minutes)']
   resend_count number [not null, default: 0, note: 'max 3']
   attempt_count number [not null, default: 0]
   consumed_at timestamptz
@@ -302,6 +302,15 @@ Table job_seeker_profile {
   profile_picture_file_id number [ref: > stored_file.file_id]
   expected_salary_min number(14,2)
   receive_job_alerts bool [not null, default: 1]
+  // added by oracle/05_settings.sql (Settings screen)
+  date_of_birth date
+  gender varchar2(20) [note: 'MALE | FEMALE | OTHER | PREFER_NOT_TO_SAY']
+  notify_email bool [not null, default: 1]
+  notify_application_updates bool [not null, default: 1]
+  notify_newsletter bool [not null, default: 0]
+  profile_visible bool [not null, default: 1, note: 'employers may discover the profile']
+  show_email bool [not null, default: 0]
+  show_phone bool [not null, default: 0]
   completion_percentage number(5,2) [not null, default: 0, note: 'cached; live value = hk_profile_completion()']
   completion_updated_at timestamptz
   created_at timestamptz [not null]

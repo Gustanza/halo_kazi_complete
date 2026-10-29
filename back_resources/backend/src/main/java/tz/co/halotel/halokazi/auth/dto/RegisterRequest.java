@@ -19,7 +19,7 @@ public record RegisterRequest(
         @NotNull RegistrationRole role,
         @NotBlank @Size(max = 150) String fullName,
         @NotBlank @TanzanianPhone String phone,
-        @Email @Size(max = 254) String email,
+        @Email(message = "Enter a valid email address.") @Size(max = 254) String email,
         // BCrypt only reads the first 72 bytes; 64 chars keeps multi-byte input safe.
         @NotBlank @Size(max = 64) @StrongPassword String password,
         @NotBlank String repeatPassword) implements PasswordsMatch.PasswordConfirmation {

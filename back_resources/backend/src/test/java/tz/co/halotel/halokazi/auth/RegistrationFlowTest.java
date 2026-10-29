@@ -38,14 +38,14 @@ class RegistrationFlowTest extends AbstractIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.phone").value(phone))
                 .andExpect(jsonPath("$.role").value("JOB_SEEKER"))
-                .andExpect(jsonPath("$.otpExpiresInSeconds").value(120))
+                .andExpect(jsonPath("$.otpExpiresInSeconds").value(300))
                 .andExpect(jsonPath("$.resendAvailableInSeconds").value(30))
                 .andReturn();
         long userId = ((Number) JsonPath.read(body(reg), "$.userId")).longValue();
 
         assertThat(sms.sentTo(phone)).hasSize(1);
         String code = sms.lastCodeFor(phone);
-        assertThat(sms.sentTo(phone).getFirst().text()).contains("expires in 2 minutes");
+        assertThat(sms.sentTo(phone).getFirst().text()).contains("expires in 5 minutes");
 
         assertThat(queryString("select account_status from app_user where user_id = ?", userId))
                 .isEqualTo("PENDING_VERIFICATION");
@@ -58,9 +58,9 @@ class RegistrationFlowTest extends AbstractIntegrationTest {
         assertThat(queryInt("select count(*) from employer where user_id = ?", userId)).isZero();
         assertThat(queryInt("select count(*) from otp_code where user_id = ? and consumed_at is null "
                 + "and purpose = 'PHONE_VERIFICATION' and resend_count = 0 and attempt_count = 0", userId)).isEqualTo(1);
-        // expires_at is ~120 s from now
+        // expires_at is ~300 s from now
         assertThat(queryInt("select count(*) from otp_code where user_id = ? and expires_at between "
-                + "systimestamp + interval '100' second and systimestamp + interval '125' second", userId)).isEqualTo(1);
+                + "systimestamp + interval '280' second and systimestamp + interval '305' second", userId)).isEqualTo(1);
         assertThat(queryInt("select count(*) from sms_log where user_id = ? and delivery_status = 'SENT' "
                 + "and purpose = 'PHONE_VERIFICATION' and provider_message_id like 'test-%' and sent_at is not null",
                 userId)).isEqualTo(1);
@@ -252,6 +252,14 @@ class RegistrationFlowTest extends AbstractIntegrationTest {
     void malformedJsonIs400() throws Exception {
         postJson("/api/auth/register", "{not json").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+    }
+
+    @Test
+    void nonJsonBodyIs415() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/auth/register")
+                        .contentType(org.springframework.http.MediaType.TEXT_PLAIN).content("{}"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
     }
 
     @Test

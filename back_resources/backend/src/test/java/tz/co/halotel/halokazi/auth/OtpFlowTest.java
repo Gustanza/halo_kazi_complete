@@ -127,7 +127,7 @@ class OtpFlowTest extends AbstractIntegrationTest {
         postJson("/api/auth/otp/resend", Map.of("phone", r.phone()))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.message").value(ResendOtpResponse.MESSAGE))
-                .andExpect(jsonPath("$.otpExpiresInSeconds").value(120))
+                .andExpect(jsonPath("$.otpExpiresInSeconds").value(300))
                 .andExpect(jsonPath("$.resendAvailableInSeconds").value(30));
         assertThat(sms.sentTo(r.phone())).hasSize(2);
         String newCode = sms.lastCodeFor(r.phone());
@@ -176,7 +176,7 @@ class OtpFlowTest extends AbstractIntegrationTest {
         postJson("/api/auth/otp/resend", Map.of("phone", newPhone()))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.message").value(ResendOtpResponse.MESSAGE))
-                .andExpect(jsonPath("$.otpExpiresInSeconds").value(120))
+                .andExpect(jsonPath("$.otpExpiresInSeconds").value(300))
                 .andExpect(jsonPath("$.resendAvailableInSeconds").value(30));
         assertThat(sms.all()).isEmpty();
     }

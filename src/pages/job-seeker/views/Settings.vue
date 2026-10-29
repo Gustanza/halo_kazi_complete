@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   UserRound, LockKeyhole, Bell, ShieldCheck, Globe, Palette,
   CircleHelp, Camera, Save, MapPin, Settings as SettingsIcon,
@@ -8,38 +8,26 @@ import {
 } from 'lucide-vue-next'
 
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
-import Skeleton from '../../../components/ui/Skeleton.vue'
-import { useAuthStore } from '../../../stores/auth'
-import * as profileApi from '../../../api/profile'
-import { useToast } from '../../../composables/useToast'
+import * as accountApi from '../../../api/accountApi'
+import { useSession } from '../../../auth/session'
+import { useTheme } from '../../../composables/useTheme'
 
-const auth = useAuthStore()
-const toast = useToast()
+const session = useSession()
+const { preference: themePreference, setPreference: setThemePreference } = useTheme()
 
-const loading = ref(true)
-const saving = ref(false)
 const activeSection = ref('account')
 const savedMessage = ref('')
+const messageTone = ref('success') // 'success' | 'error'
+const loading = ref(true)
+const loadError = ref('')
+const saving = ref(false)
 const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
-const photoPreview = ref('')
+const photoPreview = ref('') // shown once profile photos can be uploaded (no file storage yet)
 
-// Account identity (fullName/email/phone) comes from the auth store's user - these are
-// AppUser columns, changed via registration/verification, not a Settings form. The rest
-// (dateOfBirth/gender/location/about) lives in the same profile stub ProfileView.vue edits,
-// so the two pages stay consistent instead of each keeping their own fake person.
-const account = computed(() => ({
-  fullName: auth.user.value?.fullName || '',
-  email: auth.user.value?.email || '',
-  phone: auth.user.value?.phone || '',
-  dateOfBirth: profile.value.personalInfo.dateOfBirth,
-  gender: profile.value.personalInfo.gender,
-  location: profile.value.personalInfo.location,
-  about: profile.value.personalInfo.summary,
-}))
-
-const profile = ref({ personalInfo: { dateOfBirth: '', gender: '', location: '', summary: '' } })
+// Filled from GET /api/me/settings.
+const account = ref({ fullName: '', phone: '', dateOfBirth: '', gender: '', location: '', about: '' })
 
 const password = ref({
   current: '',
@@ -60,28 +48,16 @@ const privacy = ref({
   showPhone: false
 })
 
+const LANGUAGE_LABELS = { EN: 'English', SW: 'Kiswahili' }
+const THEME_LABELS = { light: 'Light', dark: 'Dark', system: 'System' }
+const GENDER_LABELS = { MALE: 'Male', FEMALE: 'Female', OTHER: 'Other', PREFER_NOT_TO_SAY: 'Prefer not to say' }
+const NOT_PROVIDED = 'Not provided'
+
 const preferences = ref({
   language: 'English',
-  region: 'Tanzania',
-  appearance: 'Light'
+  region: 'Tanzania', // Halokazi serves Tanzania only, so region is not a saved setting
+  appearance: THEME_LABELS[themePreference.value]
 })
-
-async function loadSettings() {
-  loading.value = true
-  try {
-    const [profileData, settings] = await Promise.all([profileApi.getProfile(), profileApi.getSettings()])
-    profile.value = profileData
-    notifications.value = settings.notifications
-    privacy.value = settings.privacy
-    preferences.value = settings.preferences
-  } catch {
-    toast.error('Could not load your settings.')
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(loadSettings)
 
 const sections = [
   { id: 'account', label: 'Account Information', icon: UserRound },
@@ -100,9 +76,10 @@ const notificationItems = [
   { key: 'newsletter', title: 'Career tips and newsletter', desc: 'Receive career advice and platform news.' }
 ]
 
+// No showEmail toggle: job seekers register and log in with phone number alone and have no
+// real email to display (see RegistrationService / AccountSettingsService).
 const privacyItems = [
   { key: 'profileVisible', title: 'Profile visibility', desc: 'Allow employers to discover your profile.' },
-  { key: 'showEmail', title: 'Display email address', desc: 'Allow employers to see your email on your profile.' },
   { key: 'showPhone', title: 'Display phone number', desc: 'Allow employers to see your phone number.' }
 ]
 
@@ -110,76 +87,108 @@ const sectionTitle = computed(() =>
   sections.find(item => item.id === activeSection.value)?.label || 'Settings'
 )
 
-const aboutCount = computed(() => account.value.about.length)
+const aboutCount = computed(() => (account.value.about === NOT_PROVIDED ? 0 : account.value.about.length))
+
+/** Copies a GET/PUT /api/me/settings response into the screen's state. */
+function applySettings(settings) {
+  const a = settings.account
+  const place = [a.location?.address, a.location?.district, a.location?.region?.nameEn].filter(Boolean)
+  account.value = {
+    fullName: a.fullName,
+    phone: a.phone,
+    dateOfBirth: a.dateOfBirth || NOT_PROVIDED,
+    gender: GENDER_LABELS[a.gender] || NOT_PROVIDED,
+    location: place.length ? `${place.join(', ')}, Tanzania` : NOT_PROVIDED,
+    about: a.about || NOT_PROVIDED
+  }
+  notifications.value = {
+    email: settings.notifications.email,
+    applications: settings.notifications.applicationUpdates,
+    jobAlerts: settings.notifications.jobAlerts,
+    newsletter: settings.notifications.newsletter
+  }
+  privacy.value = { ...settings.privacy }
+  preferences.value.language = LANGUAGE_LABELS[settings.preferences.language] || 'English'
+}
+
+async function loadSettings() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    applySettings(await accountApi.getSettings())
+  } catch (e) {
+    loadError.value = e.message
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadSettings)
+
+function showMessage(text, tone = 'success') {
+  savedMessage.value = text
+  messageTone.value = tone
+}
 
 async function saveChanges() {
+  if (saving.value) return
   saving.value = true
-  savedMessage.value = ''
   try {
-    if (activeSection.value === 'password') {
-      if (password.value.next.length < 8) {
-        savedMessage.value = 'Password must contain at least 8 characters.'
-        return
-      }
-      if (password.value.next !== password.value.confirm) {
-        savedMessage.value = 'Passwords do not match.'
-        return
-      }
-      await profileApi.changePassword({ currentPassword: password.value.current, newPassword: password.value.next })
-      password.value = { current: '', next: '', confirm: '' }
-      toast.success('Password updated.')
-    } else if (activeSection.value === 'notifications') {
-      await profileApi.updateSettings({ notifications: notifications.value })
-      toast.success('Notification preferences saved.')
-    } else if (activeSection.value === 'privacy') {
-      await profileApi.updateSettings({ privacy: privacy.value })
-      toast.success('Privacy settings saved.')
-    } else {
-      await profileApi.updateSettings({ preferences: preferences.value })
-      toast.success('Preferences saved.')
+    switch (activeSection.value) {
+      case 'password':
+        await savePassword()
+        break
+      case 'notifications':
+        applySettings(await accountApi.updateNotifications({
+          email: notifications.value.email,
+          applicationUpdates: notifications.value.applications,
+          jobAlerts: notifications.value.jobAlerts,
+          newsletter: notifications.value.newsletter
+        }))
+        showMessage('Notification preferences saved.')
+        break
+      case 'privacy':
+        applySettings(await accountApi.updatePrivacy({ ...privacy.value }))
+        showMessage('Privacy settings saved.')
+        break
+      case 'language':
+        applySettings(await accountApi.updateLanguage(preferences.value.language === 'Kiswahili' ? 'SW' : 'EN'))
+        await session.refresh() // keep the signed-in user's preferredLanguage in step
+        showMessage('Language saved.')
+        break
+      case 'appearance':
+        // Appearance is a per-device choice, kept in this browser.
+        setThemePreference(preferences.value.appearance.toLowerCase())
+        showMessage('Appearance saved on this device.')
+        break
     }
-  } catch (error) {
-    savedMessage.value = error?.message || 'Unable to save. Please try again.'
+  } catch (e) {
+    showMessage(e.message, 'error')
   } finally {
     saving.value = false
   }
 }
 
-function uploadPhoto(event) {
-  const file = event.target.files?.[0]
-  if (!file) return
-
-  if (!['image/jpeg', 'image/png'].includes(file.type)) {
-    savedMessage.value = 'Please select a JPG or PNG image.'
+async function savePassword() {
+  if (password.value.next !== password.value.confirm) {
+    showMessage('Passwords do not match.', 'error')
     return
   }
-
-  if (file.size > 2 * 1024 * 1024) {
-    savedMessage.value = 'Image must be smaller than 2MB.'
-    return
-  }
-
-  if (photoPreview.value) URL.revokeObjectURL(photoPreview.value)
-  photoPreview.value = URL.createObjectURL(file)
-  savedMessage.value = 'Photo preview updated.'
-}
-
-function openQuickLink(link) {
-  // Badilisha route hizi kulingana na router yako.
-  if (link.route) {
-    window.location.href = link.route
+  try {
+    await accountApi.changePassword(password.value.current, password.value.next, password.value.confirm)
+    password.value = { current: '', next: '', confirm: '' }
+    showMessage('Password changed. Any other devices signed in to your account have been signed out.')
+  } catch (e) {
+    // Field errors (wrong current password, weak new password) are more specific than the summary.
+    showMessage(e.fieldErrors?.[0]?.message || e.message, 'error')
   }
 }
+
 </script>
 
 <template>
   <DashboardLayout>
-    <div v-if="loading" class="min-w-0 space-y-6 pb-8">
-      <Skeleton variant="card" height="3.5rem" />
-      <Skeleton variant="card" height="24rem" />
-    </div>
-
-    <div v-else class="min-w-0 space-y-6 pb-8">
+    <div class="min-w-0 space-y-6 pb-8">
 
       <!-- Page heading -->
       <header class="flex items-center gap-4">
@@ -240,7 +249,7 @@ function openQuickLink(link) {
                 </h2>
                 <p class="mt-1 text-xs leading-5 text-slate-500">
                   <template v-if="activeSection === 'account'">
-                    Update your personal details and contact information.
+                    Your personal details and contact information. Edit them from My Profile.
                   </template>
                   <template v-else-if="activeSection === 'password'">
                     Keep your account secure with a strong password.
@@ -269,6 +278,7 @@ function openQuickLink(link) {
               type="button"
               class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-orange-700"
               @click="saveChanges"
+                :disabled="saving"
             >
               <Save :size="15" />
               Save Changes
@@ -278,7 +288,10 @@ function openQuickLink(link) {
           <!-- Feedback message -->
           <div
             v-if="savedMessage"
-            class="mb-5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-xs leading-5 text-orange-800"
+            class="mb-5 rounded-lg border px-4 py-3 text-xs leading-5"
+            :class="messageTone === 'error'
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'"
             role="status"
           >
             {{ savedMessage }}
@@ -287,8 +300,15 @@ function openQuickLink(link) {
             </button>
           </div>
 
+          <!-- Loading / load failure (GET /api/me/settings) -->
+          <p v-if="loading" class="py-10 text-center text-sm text-slate-500">Loading your settings…</p>
+          <div v-else-if="loadError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+            We couldn't load your settings. {{ loadError }}
+            <button type="button" class="ml-2 font-bold underline" @click="loadSettings">Try again</button>
+          </div>
+
           <!-- ACCOUNT INFORMATION -->
-          <div v-if="activeSection === 'account'" class="space-y-6">
+          <div v-else-if="activeSection === 'account'" class="space-y-6">
 
             <!-- Profile photo -->
             <div class="flex flex-wrap items-center gap-4">
@@ -321,13 +341,6 @@ function openQuickLink(link) {
                   <p class="text-xs font-semibold text-slate-500">Full Name</p>
                   <p class="mt-2 break-words text-sm font-medium text-slate-800">
                     {{ account.fullName }}
-                  </p>
-                </div>
-
-                <div>
-                  <p class="text-xs font-semibold text-slate-500">Email Address</p>
-                  <p class="mt-2 break-words text-sm font-medium text-slate-800">
-                    {{ account.email }}
                   </p>
                 </div>
 
@@ -457,7 +470,7 @@ function openQuickLink(link) {
             <div class="border-t border-slate-100 pt-5">
               <button
                 type="submit"
-                :disabled="!password.current || password.next.length < 8 || password.next !== password.confirm"
+                :disabled="saving || !password.current || password.next.length < 8 || password.next !== password.confirm"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Update Password
@@ -494,6 +507,7 @@ function openQuickLink(link) {
                 type="button"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white hover:bg-orange-700"
                 @click="saveChanges"
+                :disabled="saving"
               >
                 Save Preferences
               </button>
@@ -529,6 +543,7 @@ function openQuickLink(link) {
                 type="button"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white hover:bg-orange-700"
                 @click="saveChanges"
+                :disabled="saving"
               >
                 Save Privacy Settings
               </button>
@@ -552,12 +567,11 @@ function openQuickLink(link) {
               Country / Region
               <select
                 v-model="preferences.region"
-                class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-normal outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-50"
+                disabled
+                title="Halokazi is available in Tanzania"
+                class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-normal outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-50 disabled:cursor-not-allowed disabled:bg-slate-50"
               >
                 <option>Tanzania</option>
-                <option>Kenya</option>
-                <option>Uganda</option>
-                <option>Other</option>
               </select>
             </label>
 
@@ -566,6 +580,7 @@ function openQuickLink(link) {
                 type="button"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white hover:bg-orange-700"
                 @click="saveChanges"
+                :disabled="saving"
               >
                 Save Preferences
               </button>
@@ -623,6 +638,7 @@ function openQuickLink(link) {
                 type="button"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white hover:bg-orange-700"
                 @click="saveChanges"
+                :disabled="saving"
               >
                 Save Appearance
               </button>
@@ -654,9 +670,6 @@ function openQuickLink(link) {
               <ChevronRight :size="17" />
             </a>
 
-            <p class="text-xs leading-5 text-slate-400">
-              Replace the support email with the official contact address for your platform.
-            </p>
           </div>
         </main>
       </div>

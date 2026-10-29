@@ -6,11 +6,11 @@ import StatCard from '../components/dashboard/StatCard.vue'
 import RecommendedJobItem from '../components/dashboard/RecommendedJobItem.vue'
 import QuickActionItem from '../components/dashboard/QuickActionItem.vue'
 import Skeleton from '../../../components/ui/Skeleton.vue'
-import { useAuthStore } from '../../../stores/auth'
+import { useSession } from '../../../auth/session'
 import * as profileApi from '../../../api/profile'
 import { useToast } from '../../../composables/useToast'
 
-const auth = useAuthStore()
+const session = useSession()
 const toast = useToast()
 
 const loading = ref(true)
@@ -24,7 +24,7 @@ const greeting = computed(() => {
   return 'Good Evening'
 })
 
-const firstName = computed(() => auth.user.value?.fullName?.split(' ')[0] ?? '')
+const firstName = computed(() => session.user.value?.fullName?.split(/\s+/)[0] ?? '')
 
 // RecommendedJobItem expects {title, company, initials, brandColor, location, type, isNew} -
 // the vacancy-shaped stub returns {title, company, companyInitials, companyColor, location,

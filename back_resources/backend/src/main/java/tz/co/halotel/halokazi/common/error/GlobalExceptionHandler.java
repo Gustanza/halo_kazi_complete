@@ -10,7 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -51,6 +53,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ApiError.of(ErrorCode.MALFORMED_REQUEST));
     }
 
+    /** A query or path parameter of the wrong type, e.g. ?page=abc or /jobs/abc. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest()
+                .body(ApiError.validation(List.of(new ApiError.FieldError(ex.getName(), "Invalid value."))));
+    }
+
     /** Safety net for races the service-level duplicate checks cannot see (unique indexes). */
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ApiError> handleIntegrity(DataIntegrityViolationException ex) {
@@ -67,6 +76,12 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiError> handleMethod(HttpRequestMethodNotSupportedException ex) {
         return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.status())
                 .body(ApiError.of(ErrorCode.METHOD_NOT_ALLOWED));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ApiError> handleMediaType(HttpMediaTypeNotSupportedException ex) {
+        return ResponseEntity.status(ErrorCode.UNSUPPORTED_MEDIA_TYPE.status())
+                .body(ApiError.of(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
     }
 
     @ExceptionHandler(Exception.class)

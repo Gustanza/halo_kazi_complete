@@ -3,13 +3,14 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Moon, Sun, Bell, ChevronDown, Menu, UserRound, Settings, LogOut } from 'lucide-vue-next'
 import { useTheme } from '../../../../composables/useTheme'
-import { useAuthStore } from '../../../../stores/auth'
+import { useSession } from '../../../../auth/session'
 import * as notificationsApi from '../../../../api/notifications'
 
 defineEmits(['toggle-sidebar'])
 
 const router = useRouter()
-const auth = useAuthStore()
+const session = useSession()
+const fullName = computed(() => session.user.value?.fullName ?? '')
 const { theme, toggleTheme } = useTheme()
 const userMenuOpen = ref(false)
 const notifOpen = ref(false)
@@ -39,18 +40,18 @@ onMounted(() => {
 onUnmounted(() => document.removeEventListener('click', onClickOutside))
 
 const initials = computed(() =>
-  (auth.user.value?.fullName ?? '')
-    .split(' ')
+  fullName.value
+    .split(/\s+/)
     .filter(Boolean)
-    .map((part) => part[0])
+    .map((part) => part[0].toUpperCase())
     .join('')
     .slice(0, 2) || '?',
 )
 
-async function handleLogout() {
-  userMenuOpen.value = false
-  await auth.logout()
-  router.push('/login')
+async function logOut() {
+  closeMenus()
+  await session.logout()
+  router.replace('/login')
 }
 </script>
 
@@ -132,7 +133,7 @@ async function handleLogout() {
             <span class="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
               {{ initials }}
             </span>
-            <span class="hidden text-sm font-medium sm:inline" style="color: var(--color-text)">{{ auth.user.value?.fullName }}</span>
+            <span class="hidden text-sm font-medium sm:inline" style="color: var(--color-text)">{{ fullName }}</span>
             <ChevronDown :size="15" style="color: var(--color-text-muted)" />
           </button>
           <Transition name="popover">
@@ -157,7 +158,7 @@ async function handleLogout() {
               <button
                 type="button"
                 class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-500/10"
-                @click="handleLogout"
+                @click="logOut"
               >
                 <LogOut :size="16" /> Log out
               </button>

@@ -118,6 +118,51 @@ public abstract class AbstractIntegrationTest {
         return JsonPath.read(body(result), "$.token");
     }
 
+    // ---------------------------------------------------------------- employers & vacancies
+
+    /** An APPROVED employer with an ACTIVE account; returns employer_id. */
+    protected long employer(String name, String category) {
+        String email = newEmail();
+        exec("""
+                insert into app_user (full_name, email, phone, password_hash, role, account_status, phone_verified)
+                values (?, ?, ?, 'x', 'EMPLOYER', 'ACTIVE', 1)""", name, email, newPhone());
+        long userId = queryInt("select user_id from app_user where email = ?", email);
+        exec("""
+                insert into employer (user_id, business_name, registration_number, tin, verification_status,
+                                      approved_at, category_id)
+                values (?, ?, ?, ?, 'APPROVED', systimestamp,
+                        (select category_id from job_category where code = ?))""",
+                userId, name, "IT-" + userId, "8" + userId, category);
+        return queryInt("select employer_id from employer where user_id = ?", userId);
+    }
+
+    /** Inserts a vacancy and backdates published_at; returns its id. */
+    protected long vacancy(long employerId, String title, String region, String type, String category,
+            double years, Long salaryMin, Long salaryMax, int postedDaysAgo, String status) {
+        exec("""
+                insert into vacancy (employer_id, job_title, job_description, job_requirements, qualifications,
+                    work_experience, min_experience_years, region_id, employment_type_id, number_of_positions,
+                    application_deadline, category_id, salary_min, salary_max, salary_period, status, created_by,
+                    min_education_level_id)
+                values (?, ?, 'desc', 'reqs', 'quals', 'some', ?,
+                    (select region_id from region where code = ?),
+                    (select employment_type_id from employment_type where code = ?), 2,
+                    systimestamp + interval '10' day,
+                    (select category_id from job_category where code = ?), ?, ?,
+                    case when ? is not null or ? is not null then 'MONTH' end, ?,
+                    (select user_id from employer where employer_id = ?),
+                    (select education_level_id from education_level where code = 'BACHELOR'))""",
+                employerId, title, years, region, type, category, salaryMin, salaryMax, salaryMin, salaryMax,
+                status, employerId);
+        long id = queryInt("select max(vacancy_id) from vacancy where employer_id = ? and job_title = ?",
+                employerId, title);
+        if ("ACTIVE".equals(status)) {
+            exec("update vacancy set published_at = systimestamp - numtodsinterval(?, 'DAY') where vacancy_id = ?",
+                    postedDaysAgo, id);
+        }
+        return id;
+    }
+
     // ---------------------------------------------------------------- http
 
     protected ResultActions postJson(String url, Object body) throws Exception {

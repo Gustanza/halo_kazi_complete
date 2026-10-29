@@ -23,12 +23,12 @@ import EmptyState from '../../../components/ui/EmptyState.vue'
 import * as jobsApi from '../../../api/jobs'
 import * as cvApi from '../../../api/cv'
 import * as applicationsApi from '../../../api/applications'
-import { useAuthStore } from '../../../stores/auth'
+import { useSession } from '../../../auth/session'
 import { ApiRequestError } from '../../../api/http'
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
+const session = useSession()
 
 const jobId = route.params.jobId
 
@@ -196,7 +196,7 @@ async function submitApplication() {
               <div class="space-y-1.5">
                 <label class="block text-xs font-bold text-slate-800">Full Name</label>
                 <input
-                  :value="auth.user.value?.fullName"
+                  :value="session.user.value?.fullName"
                   type="text"
                   disabled
                   class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500"
@@ -204,10 +204,10 @@ async function submitApplication() {
               </div>
 
               <div class="space-y-1.5">
-                <label class="block text-xs font-bold text-slate-800">Email Address</label>
+                <label class="block text-xs font-bold text-slate-800">Phone Number</label>
                 <input
-                  :value="auth.user.value?.email"
-                  type="email"
+                  :value="session.user.value?.phone"
+                  type="tel"
                   disabled
                   class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500"
                 />

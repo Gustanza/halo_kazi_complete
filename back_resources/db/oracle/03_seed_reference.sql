@@ -11,7 +11,7 @@ SET DEFINE OFF
 INSERT INTO system_setting (setting_key, setting_value, value_type, description) VALUES
     ('PROFILE_MIN_COMPLETION', '75', 'NUMBER', 'Minimum profile completion % required to apply (APP-01)');
 INSERT INTO system_setting (setting_key, setting_value, value_type, description) VALUES
-    ('OTP_TTL_SECONDS', '120', 'NUMBER', 'SMS OTP validity (AUTH-03)');
+    ('OTP_TTL_SECONDS', '300', 'NUMBER', 'SMS OTP validity (AUTH-03; extended from 2 to 5 min)');
 INSERT INTO system_setting (setting_key, setting_value, value_type, description) VALUES
     ('OTP_MAX_RESENDS', '3', 'NUMBER', 'Max OTP resends within the control window (AUTH-03)');
 INSERT INTO system_setting (setting_key, setting_value, value_type, description) VALUES
@@ -185,18 +185,24 @@ INSERT INTO admin_permission (code, module, name_en, name_sw, description) VALUE
     ('REFERENCE_DATA_MANAGE', 'SETTINGS', 'Manage reference data', 'Kusimamia orodha za mfumo', 'Maintain categories, skills, regions and other lists');
 
 --------------------------------------------------------------------------------
--- CV templates (CV-02: 5 predefined). layout_definition filled by the dev team.
+-- CV templates (CV-02: 5 predefined). layout_definition.preview drives the thumbnail colours;
+-- the rest of layout_definition is filled in when the PDF renderer is built.
 --------------------------------------------------------------------------------
-INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order) VALUES
-    ('CLASSIC', 'Classic', 'Kawaida', 'Traditional single-column layout', 'Mpangilio wa kawaida wa safu moja', 1);
-INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order) VALUES
-    ('MODERN', 'Modern', 'Kisasa', 'Two-column layout with sidebar', 'Mpangilio wa safu mbili wenye upande', 2);
-INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order) VALUES
-    ('PROFESSIONAL', 'Professional', 'Kitaaluma', 'Formal layout for experienced candidates', 'Mpangilio rasmi kwa wenye uzoefu', 3);
-INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order) VALUES
-    ('MINIMAL', 'Minimal', 'Rahisi', 'Clean, minimal design', 'Muundo safi na rahisi', 4);
-INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order) VALUES
-    ('GRADUATE', 'Graduate', 'Mhitimu', 'Education-first layout for new graduates', 'Mpangilio unaoanza na elimu kwa wahitimu', 5);
+INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order, layout_definition) VALUES
+    ('CLASSIC', 'Classic', 'Kawaida', 'Traditional single-column layout', 'Mpangilio wa kawaida wa safu moja', 1,
+     '{"preview":{"scheme":"light","accent":"#14213D"}}');
+INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order, layout_definition) VALUES
+    ('MODERN', 'Modern', 'Kisasa', 'Two-column layout with sidebar', 'Mpangilio wa safu mbili wenye upande', 2,
+     '{"preview":{"scheme":"light","accent":"#2FB573"}}');
+INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order, layout_definition) VALUES
+    ('PROFESSIONAL', 'Professional', 'Kitaaluma', 'Formal layout for experienced candidates', 'Mpangilio rasmi kwa wenye uzoefu', 3,
+     '{"preview":{"scheme":"dark","accent":"#FD5C20"}}');
+INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order, layout_definition) VALUES
+    ('MINIMAL', 'Minimal', 'Rahisi', 'Clean, minimal design', 'Muundo safi na rahisi', 4,
+     '{"preview":{"scheme":"light","accent":"#2F8FF5"}}');
+INSERT INTO cv_template (code, name_en, name_sw, description_en, description_sw, sort_order, layout_definition) VALUES
+    ('GRADUATE', 'Graduate', 'Mhitimu', 'Education-first layout for new graduates', 'Mpangilio unaoanza na elimu kwa wahitimu', 5,
+     '{"preview":{"scheme":"light","accent":"#B064F7"}}');
 
 --------------------------------------------------------------------------------
 -- Notification templates (section 11). Placeholders: {name}, {vacancy_title}, {company}, {ref}, {otp}
@@ -249,7 +255,7 @@ INSERT INTO notification_template (template_code, channel, title_en, title_sw, b
 INSERT INTO notification_template (template_code, channel, title_en, title_sw, body_en, body_sw) VALUES
     ('OTP_PHONE_VERIFICATION', 'SMS',
      'Halokazi verification code', 'Nambari ya uthibitisho ya Halokazi',
-     'Your Halokazi verification code is {otp}. It expires in 2 minutes.',
-     'Nambari yako ya uthibitisho ya Halokazi ni {otp}. Itaisha muda baada ya dakika 2.');
+     'Your Halokazi verification code is {otp}. It expires in 5 minutes.',
+     'Nambari yako ya uthibitisho ya Halokazi ni {otp}. Itaisha muda baada ya dakika 5.');
 
 COMMIT;

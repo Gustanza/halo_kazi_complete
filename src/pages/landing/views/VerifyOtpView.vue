@@ -3,24 +3,27 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ShieldCheck, MessageSquareText } from 'lucide-vue-next'
 import AuthSplitLayout from '../components/auth/AuthSplitLayout.vue'
-import { useAuthStore } from '../../../stores/auth'
-import { ApiRequestError } from '../../../api/http'
+import FormAlert from '../../../components/common/FormAlert.vue'
+import { resendOtp, verifyOtp } from '../../../api/authApi'
+import { useSession } from '../../../auth/session'
+import { formatWait, maskPhone } from '../../../auth/formatting'
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuthStore()
+const session = useSession()
 
+// Set by Register/Login: phone is the normalised +255 number, resend the seconds until "Resend" unlocks.
 const phone = String(route.query.phone || '')
-const role = String(route.query.role || 'job_seeker')
 const name = String(route.query.name || '')
+const initialCooldown = Number.parseInt(route.query.resend, 10)
 
 const code = ref('')
 const verified = ref(false)
-const resendCooldown = ref(Number(route.query.resendAvailableInSeconds) || 30)
+const resendCooldown = ref(Number.isFinite(initialCooldown) ? initialCooldown : 30)
 const shake = ref(false)
 const submitting = ref(false)
-const resending = ref(false)
-const formError = ref('')
+const error = ref('')
+const notice = ref('')
 let timer = null
 
 onMounted(() => {
@@ -39,46 +42,58 @@ onUnmounted(() => {
   if (timer) window.clearInterval(timer)
 })
 
-const maskedPhone = computed(() => {
-  if (phone.length < 4) return phone
-  return `+255 ${phone.slice(0, -4).replace(/./g, '•')}${phone.slice(-4)}`
-})
+const maskedPhone = computed(() => maskPhone(phone))
+const resendLabel = computed(() =>
+  resendCooldown.value > 0 ? `Resend code in ${formatWait(resendCooldown.value)}` : 'Resend code',
+)
+
+function shakeInput() {
+  shake.value = true
+  window.setTimeout(() => (shake.value = false), 400)
+}
 
 async function resend() {
-  if (resendCooldown.value > 0 || resending.value) return
-  resending.value = true
-  formError.value = ''
+  if (resendCooldown.value > 0) return
+  error.value = ''
+  notice.value = ''
   try {
-    const result = await auth.resendOtp({ phone })
+    const result = await resendOtp(phone)
     resendCooldown.value = result.resendAvailableInSeconds
-  } catch (error) {
-    formError.value = error instanceof ApiRequestError ? error.message : 'Could not resend the code.'
-  } finally {
-    resending.value = false
+    code.value = ''
+    notice.value = 'A new code is on its way. The previous code no longer works.'
+  } catch (e) {
+    if (e.retryAfterSeconds) resendCooldown.value = e.retryAfterSeconds
+    error.value = e.message
   }
 }
 
 async function handleVerify() {
-  formError.value = ''
-  if (!code.value.trim()) {
-    shake.value = true
-    window.setTimeout(() => (shake.value = false), 400)
+  error.value = ''
+  notice.value = ''
+  if (!/^\d{6}$/.test(code.value.trim())) {
+    error.value = 'Enter the 6-digit code from the SMS.'
+    shakeInput()
     return
   }
+
   submitting.value = true
   try {
-    const result = await auth.verifyOtp({ phone, code: code.value.trim() })
-    if (result.user.role === 'EMPLOYER') {
-      // Employer accounts also need Admin verification (TIN/licence review) before the
-      // employer portal opens, so show the pending-review state instead of a dashboard.
-      verified.value = true
+    // A verified phone activates the account and signs the user in (AUTH-02).
+    const auth = await verifyOtp(phone, code.value.trim())
+    session.start(auth)
+    if (auth.user.role === 'EMPLOYER') {
+      verified.value = true // employers continue with business verification, not straight to a dashboard
     } else {
-      router.push('/dashboard')
+      router.replace(session.homeFor(auth.user))
     }
-  } catch (error) {
-    shake.value = true
-    window.setTimeout(() => (shake.value = false), 400)
-    formError.value = error instanceof ApiRequestError ? error.message : 'Verification failed. Please try again.'
+  } catch (e) {
+    shakeInput()
+    if (e.code === 'OTP_INVALID') {
+      const left = e.details.remainingAttempts
+      error.value = left ? `Incorrect code. ${left} attempt${left === 1 ? '' : 's'} left.` : e.message
+    } else {
+      error.value = e.message // OTP_EXPIRED / OTP_ATTEMPTS_EXCEEDED already say "request a new code"
+    }
   } finally {
     submitting.value = false
   }
@@ -102,6 +117,9 @@ async function handleVerify() {
         </p>
 
         <form class="mt-7 space-y-6" @submit.prevent="handleVerify">
+          <FormAlert v-if="error">{{ error }}</FormAlert>
+          <FormAlert v-else-if="notice" tone="info">{{ notice }}</FormAlert>
+
           <div>
             <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">Verification code</label>
             <input
@@ -117,9 +135,7 @@ async function handleVerify() {
             />
           </div>
 
-          <p v-if="formError" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10">{{ formError }}</p>
-
-          <button type="submit" class="btn-primary w-full" :disabled="submitting">
+          <button type="submit" class="btn-primary w-full disabled:opacity-70" :disabled="submitting">
             {{ submitting ? 'Verifying…' : 'Verify & Continue' }}
           </button>
         </form>
@@ -127,11 +143,11 @@ async function handleVerify() {
         <button
           type="button"
           class="mt-4 w-full text-center text-sm font-medium transition-colors"
-          :style="resendCooldown > 0 || resending ? 'color: var(--color-text-muted)' : 'color: #FD5C20'"
-          :disabled="resendCooldown > 0 || resending"
+          :style="resendCooldown > 0 ? 'color: var(--color-text-muted)' : 'color: #FD5C20'"
+          :disabled="resendCooldown > 0"
           @click="resend"
         >
-          {{ resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : resending ? 'Resending…' : 'Resend code' }}
+          {{ resendLabel }}
         </button>
       </div>
 
@@ -139,7 +155,9 @@ async function handleVerify() {
         <div class="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-white">
           <ShieldCheck :size="20" />
         </div>
-        <h2 class="mt-4 text-xl font-bold" style="color: var(--color-text)">Account verified{{ name ? `, ${name}` : '' }}!</h2>
+        <h2 class="mt-4 text-xl font-bold" style="color: var(--color-text)">
+          Account verified{{ (session.user.value?.fullName ?? name) ? `, ${session.user.value?.fullName ?? name}` : '' }}!
+        </h2>
         <p class="mt-2 text-sm leading-relaxed" style="color: var(--color-text-muted)">
           Your employer account has passed automatic verification. The next step in the documented process is attaching
           your TIN and Business Licence for Admin review — that part of the employer portal isn't built yet, so we'll

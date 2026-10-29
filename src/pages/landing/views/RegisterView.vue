@@ -3,11 +3,10 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Eye, EyeOff, Mail, Lock, User, Search, Building2, Check } from 'lucide-vue-next'
 import AuthSplitLayout from '../components/auth/AuthSplitLayout.vue'
-import { useAuthStore } from '../../../stores/auth'
-import { ApiRequestError } from '../../../api/http'
+import FormAlert from '../../../components/common/FormAlert.vue'
+import { register, resendOtp } from '../../../api/authApi'
 
 const router = useRouter()
-const auth = useAuthStore()
 
 const fullName = ref('')
 const phone = ref('')
@@ -16,9 +15,6 @@ const password = ref('')
 const repeatPassword = ref('')
 const showPassword = ref(false)
 const role = ref('job_seeker') // 'job_seeker' | 'employer'
-const submitting = ref(false)
-const formError = ref('')
-const fieldErrors = ref({})
 
 const roleOptions = [
   { value: 'job_seeker', icon: Search, label: 'Job Seeker', description: "I'm looking for a job" },
@@ -28,47 +24,69 @@ const roleOptions = [
 const isEmployer = computed(() => role.value === 'employer')
 const nameLabel = computed(() => (isEmployer.value ? 'Company name' : 'Full name'))
 const namePlaceholder = computed(() => (isEmployer.value ? 'Enter your company name' : 'Enter your full name'))
-const emailLabel = computed(() => (isEmployer.value ? 'Company email' : 'Email address'))
+const emailLabel = computed(() => (isEmployer.value ? 'Company email' : 'Email'))
+
+const submitting = ref(false)
+const error = ref('')
+const fieldErrors = ref({}) // backend messages per field: { phone: '...', password: '...' }
+const pendingPhone = ref('') // the number is registered but was never verified
 
 function selectRole(value) {
   role.value = value
 }
 
+function goToVerify(normalizedPhone, resendIn) {
+  router.push({
+    name: 'verify-otp',
+    query: { phone: normalizedPhone, role: role.value, name: fullName.value, resend: resendIn },
+  })
+}
+
 async function handleSubmit() {
-  formError.value = ''
+  error.value = ''
+  pendingPhone.value = ''
   fieldErrors.value = {}
+  if (password.value !== repeatPassword.value) {
+    fieldErrors.value = { repeatPassword: 'Passwords do not match.' }
+    return
+  }
+
   submitting.value = true
   try {
-    const result = await auth.register({
+    // Every new account must pass SMS (OTP) verification before it can log in (AUTH-02).
+    // Job seekers register with phone number alone; email is only collected for employers.
+    const result = await register({
       role: role.value,
       fullName: fullName.value,
       phone: phone.value,
-      email: email.value,
+      email: isEmployer.value ? email.value : '',
       password: password.value,
       repeatPassword: repeatPassword.value,
     })
-    // Per the documented TO-BE flow, every new account must pass System (OTP/SMS)
-    // verification before it can log in - hand off to that step.
-    router.push({
-      path: '/verify-otp',
-      query: {
-        phone: result.phone,
-        role: role.value,
-        name: fullName.value,
-        otpExpiresInSeconds: result.otpExpiresInSeconds,
-        resendAvailableInSeconds: result.resendAvailableInSeconds,
-      },
-    })
-  } catch (error) {
-    if (error instanceof ApiRequestError) {
-      formError.value = error.fieldErrors.length ? '' : error.message
-      fieldErrors.value = Object.fromEntries(error.fieldErrors.map((e) => [e.field, e.message]))
-    } else {
-      formError.value = 'Something went wrong. Please try again.'
+    goToVerify(result.phone, result.resendAvailableInSeconds)
+  } catch (e) {
+    if (e.code === 'SMS_DELIVERY_FAILED') {
+      // The account exists but the SMS didn't go out: continue on the code screen, where "Resend" works.
+      goToVerify(phone.value, 0)
+      return
     }
+    fieldErrors.value = e.fieldMap?.() ?? {}
+    if (e.code === 'PHONE_PENDING_VERIFICATION') pendingPhone.value = e.details.phone
+    error.value = e.code === 'VALIDATION_FAILED' ? 'Please correct the highlighted fields.' : e.message
   } finally {
     submitting.value = false
   }
+}
+
+/** The account exists but was never verified: send a fresh code and continue there. */
+async function verifyPending() {
+  let wait
+  try {
+    wait = (await resendOtp(pendingPhone.value)).resendAvailableInSeconds
+  } catch (e) {
+    wait = e.retryAfterSeconds ?? undefined
+  }
+  goToVerify(pendingPhone.value, wait)
 }
 </script>
 
@@ -82,6 +100,13 @@ async function handleSubmit() {
     <p class="mt-1 text-sm" style="color: var(--color-text-muted)">Use your Halotel number to register with Halokazi.</p>
 
     <form class="mt-7 space-y-6" @submit.prevent="handleSubmit">
+      <FormAlert v-if="error">
+        {{ error }}
+        <button v-if="pendingPhone" type="button" class="ml-1 font-semibold underline" @click="verifyPending">
+          Verify this number
+        </button>
+      </FormAlert>
+
       <div>
         <label class="mb-2 block text-xs font-medium" style="color: var(--color-text-muted)">Register as</label>
         <div class="grid grid-cols-2 gap-3">
@@ -118,15 +143,13 @@ async function handleSubmit() {
             </span>
           </button>
         </div>
+        <p v-if="fieldErrors.role" class="mt-1 text-xs text-red-500">{{ fieldErrors.role }}</p>
       </div>
 
       <div class="space-y-5">
         <div>
           <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">{{ nameLabel }}</label>
-          <div
-            class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary"
-            :style="fieldErrors.fullName ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
-          >
+          <div class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
             <User :size="16" style="color: var(--color-text-muted)" />
             <input
               v-model="fullName"
@@ -142,10 +165,7 @@ async function handleSubmit() {
 
         <div>
           <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">Halotel number</label>
-          <div
-            class="flex overflow-hidden rounded-lg border transition-colors focus-within:border-primary"
-            :style="fieldErrors.phone ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
-          >
+          <div class="flex overflow-hidden rounded-lg border transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
             <span class="flex items-center gap-1 border-r px-3 text-sm font-medium" style="border-color: var(--color-border); color: var(--color-text)">+255</span>
             <input
               v-model="phone"
@@ -165,10 +185,7 @@ async function handleSubmit() {
 
         <div v-if="isEmployer">
           <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">{{ emailLabel }}</label>
-          <div
-            class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary"
-            :style="fieldErrors.email ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
-          >
+          <div class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
             <Mail :size="16" style="color: var(--color-text-muted)" />
             <input
               v-model="email"
@@ -184,10 +201,7 @@ async function handleSubmit() {
 
         <div>
           <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">Password</label>
-          <div
-            class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary"
-            :style="fieldErrors.password ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
-          >
+          <div class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
             <Lock :size="16" style="color: var(--color-text-muted)" />
             <input
               v-model="password"
@@ -203,14 +217,14 @@ async function handleSubmit() {
             </button>
           </div>
           <p v-if="fieldErrors.password" class="mt-1 text-xs text-red-500">{{ fieldErrors.password }}</p>
+          <p v-else class="mt-1 text-xs" style="color: var(--color-text-muted)">
+            At least 8 characters, with an uppercase letter, a lowercase letter, a number and a special character.
+          </p>
         </div>
 
         <div>
           <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">Repeat password</label>
-          <div
-            class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary"
-            :style="fieldErrors.repeatPassword ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
-          >
+          <div class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
             <Lock :size="16" style="color: var(--color-text-muted)" />
             <input
               v-model="repeatPassword"
@@ -225,9 +239,7 @@ async function handleSubmit() {
         </div>
       </div>
 
-      <p v-if="formError" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10">{{ formError }}</p>
-
-      <button type="submit" class="btn-primary w-full" :disabled="submitting">
+      <button type="submit" class="btn-primary w-full disabled:opacity-70" :disabled="submitting">
         {{ submitting ? 'Creating account…' : 'Create Account' }}
       </button>
     </form>

@@ -1,107 +1,102 @@
-// Thin fetch wrapper around the Halokazi backend. No axios dependency - the app only
-// needs JSON in/out, a bearer token, and one place to normalize errors.
+// Thin fetch wrapper for the Halokazi backend. Every backend error has the shape
+// { code, message, fieldErrors?, retryAfterSeconds?, details? } - see back_resources/docs/Halokazi_API.pdf.
+//
+// Two call styles share this one client, so neither side of a frontend merge has to be rewritten:
+// - getJson/postJson/request(method, path, { auth }) - used by auth/session.js, authApi.js,
+//   accountApi.js, publicApi.js and savedJobsApi.js (auth is opt-in via `auth: true`).
+// - the `http.get/post/put/patch/delete` object + `ApiRequestError` - used by the stub-backed
+//   api/*.js modules (jobs, cv, applications, profile, notifications, employers) and their
+//   views; these always send the token when one is set, since every one of their endpoints is
+//   behind login.
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
-const TOKEN_KEY = 'halokazi-token'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
-let token = null
-try {
-  token = localStorage.getItem(TOKEN_KEY)
-} catch {
-  // localStorage unavailable (private browsing, etc.)
+let tokenProvider = () => null
+let unauthorizedHandler = () => {}
+
+/** Wired up by auth/session.js so this module never imports it (avoids a cycle). */
+export function configureAuth({ getToken, onUnauthorized }) {
+  tokenProvider = getToken
+  unauthorizedHandler = onUnauthorized
 }
 
-/** Shape of every error this module throws. `code`/`fieldErrors` mirror the backend's ApiError. */
-export class ApiRequestError extends Error {
-  constructor({ status, code, message, fieldErrors, retryAfterSeconds, details }) {
-    super(message)
-    this.name = 'ApiRequestError'
+export class ApiError extends Error {
+  constructor(status, body) {
+    super(body?.message || `Request failed (${status})`)
     this.status = status
-    this.code = code
-    this.fieldErrors = fieldErrors || []
-    this.retryAfterSeconds = retryAfterSeconds ?? null
-    this.details = details || {}
+    this.code = body?.code ?? (status === 0 ? 'NETWORK_ERROR' : 'UNKNOWN_ERROR')
+    this.fieldErrors = body?.fieldErrors ?? []
+    this.retryAfterSeconds = body?.retryAfterSeconds ?? null
+    this.details = body?.details ?? {}
   }
 
-  /** Convenience lookup for showing a message under a specific form field. */
+  /** { phone: 'message', ... } for showing errors next to form fields. */
+  fieldMap() {
+    return Object.fromEntries(this.fieldErrors.map((e) => [e.field, e.message]))
+  }
+
+  /** Same lookup, single-field convenience. */
   fieldMessage(field) {
     return this.fieldErrors.find((e) => e.field === field)?.message ?? null
   }
 }
 
-/** Called by the auth store on login/logout; keeps the in-memory token and storage in sync. */
-export function setAuthToken(nextToken) {
-  token = nextToken
-  try {
-    if (nextToken) localStorage.setItem(TOKEN_KEY, nextToken)
-    else localStorage.removeItem(TOKEN_KEY)
-  } catch {
-    // ignore persistence failures
+/** Alias kept for the stub-backed api/*.js modules, written before this file had a session store. */
+export const ApiRequestError = ApiError
+
+function buildUrl(path, params) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined && value !== null && value !== '') query.append(key, value)
   }
+  const qs = query.toString()
+  return `${BASE_URL}${path}${qs ? `?${qs}` : ''}`
 }
 
-export function getAuthToken() {
-  return token
-}
-
-/** Set once by the auth store so a 401 can trigger logout + redirect without a circular import. */
-let unauthorizedHandler = null
-export function onUnauthorized(handler) {
-  unauthorizedHandler = handler
-}
-
-async function request(path, { method = 'GET', body, query, skipAuth = false } = {}) {
-  const url = new URL(BASE_URL.replace(/\/$/, '') + path, window.location.origin)
-  if (query) {
-    for (const [key, value] of Object.entries(query)) {
-      if (value === undefined || value === null || value === '') continue
-      url.searchParams.set(key, value)
-    }
-  }
-
+/** auth: true sends the session token and treats a 401 (or ACCOUNT_DISABLED) as "logged out". */
+export async function request(method, path, { params, body, signal, auth = false } = {}) {
   const headers = { Accept: 'application/json' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  if (token && !skipAuth) headers.Authorization = `Bearer ${token}`
+  const token = auth ? tokenProvider() : null
+  if (token) headers.Authorization = `Bearer ${token}`
 
   let response
   try {
-    response = await fetch(url, {
+    response = await fetch(buildUrl(path, params), {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
     })
-  } catch {
-    throw new ApiRequestError({
-      status: 0,
-      code: 'NETWORK_ERROR',
-      message: 'Could not reach the server. Check your connection and try again.',
-    })
+  } catch (error) {
+    if (error.name === 'AbortError') throw error
+    throw new ApiError(0, { message: 'Could not reach the server. Is the backend running?' })
   }
 
   if (response.status === 204) return null
-
-  const text = await response.text()
-  const data = text ? JSON.parse(text) : null
-
+  const data = await response.json().catch(() => null)
   if (!response.ok) {
-    if (response.status === 401 && !skipAuth) unauthorizedHandler?.()
-    throw new ApiRequestError({
-      status: response.status,
-      code: data?.code ?? 'UNKNOWN_ERROR',
-      message: data?.message ?? 'Something went wrong. Please try again.',
-      fieldErrors: data?.fieldErrors,
-      retryAfterSeconds: data?.retryAfterSeconds,
-      details: data?.details,
-    })
+    const error = new ApiError(response.status, data)
+    if (auth && (response.status === 401 || error.code === 'ACCOUNT_DISABLED')) unauthorizedHandler(error)
+    throw error
   }
-
   return data
 }
 
+export const getJson = (path, options) => request('GET', path, options)
+export const postJson = (path, body, options) => request('POST', path, { ...options, body })
+
+// `query` (this object's pre-session.js name for `params`) is accepted as an alias so the
+// stub-backed api/*.js modules didn't need touching for this.
+function withAuth(options) {
+  const { query, params, ...rest } = options ?? {}
+  return { ...rest, params: params ?? query, auth: true }
+}
+
 export const http = {
-  get: (path, options) => request(path, { ...options, method: 'GET' }),
-  post: (path, body, options) => request(path, { ...options, method: 'POST', body }),
-  put: (path, body, options) => request(path, { ...options, method: 'PUT', body }),
-  patch: (path, body, options) => request(path, { ...options, method: 'PATCH', body }),
-  delete: (path, options) => request(path, { ...options, method: 'DELETE' }),
+  get: (path, options) => request('GET', path, withAuth(options)),
+  post: (path, body, options) => request('POST', path, { ...withAuth(options), body }),
+  put: (path, body, options) => request('PUT', path, { ...withAuth(options), body }),
+  patch: (path, body, options) => request('PATCH', path, { ...withAuth(options), body }),
+  delete: (path, options) => request('DELETE', path, withAuth(options)),
 }

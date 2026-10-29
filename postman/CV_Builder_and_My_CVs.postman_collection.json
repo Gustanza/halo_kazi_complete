@@ -1,0 +1,1711 @@
+{
+  "info": {
+    "_postman_id": "9fa42acd-cc0d-4d6a-b6eb-85fd643d7170",
+    "name": "CV Builder and My CVs",
+    "description": "README\n\nImport: In Postman choose Import > File and select this collection JSON, then launch Collection Runner on the collection. Run the full collection from top to bottom.\n\nPrerequisites: Start the Spring Boot backend at http://localhost:8080 and make its configured persistence dependencies available, including the database if the active application profile requires one. The current CurrentJobSeekerProvider selects JobSeekerDataStore.DEFAULT_PROFILE_ID (currently profile 1); that profile must be available.\n\nRun order: CV Builder retrieves templates, creates and reads a draft, saves personal details and each section plus section configuration, chooses a template, and finalizes. Its Negative tests folder checks body/field validation, 404, incomplete finalize (422), and page-size capping. My CVs lists and reads the completed CV, renames it, duplicates it, changes template, sets default, downloads the completed CV, and removes the duplicate. Its Negative tests folder repeats the boundary checks and incomplete-finalize test, then removes the incomplete draft.\n\nResults: Runner displays each request's Post-response tests. Successful JSON requests assert expected status, success=true, and response time under 1000 ms. Download CV returns PDF bytes and tests its actual content type. Negative tests assert exact 4xx status, success=false, and no HTTP 500. The collection-level guard fails every HTTP 500. The page-size assertion assumes the default halokazi.cv.max-page-size=50.\n\nCode-matched limitations: List accepts only page and size; there is no status filter or sort parameter. The requested profileId=1 collection variable is included for reference, but the controller has no profileId query parameter; the current profile provider resolves the profile internally. Another jobseeker's CV cannot be selected because this API has no authentication/profile selector. An invalid sort field cannot be sent because no sort parameter exists. Template codes are selected from Get Templates (the DTO validation allows CLASSIC, MODERN, PROFESSIONAL, MINIMAL, GRADUATE). Mutation requests send the numeric returned data.version in If-Match. Date values use YYYY-MM-DD.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.test('Collection guard: no response is HTTP 500', function () { pm.expect(pm.response.code, 'Unexpected server error').to.not.eql(500); });"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "profileId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "cvId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "duplicateCvId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "templateCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "otherTemplateCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cvVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "duplicateVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "incompleteCvId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "incompleteVersion",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "missingCvId",
+      "value": "999999999",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "CV Builder",
+      "description": "Draft creation, editing, template selection, finalization and validation.",
+      "item": [
+        {
+          "name": "Get Templates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/templates",
+            "description": "Gets active templates and saves selected template codes from the actual response."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const a=pm.response.json().data||[]; pm.test('Templates are returned',function(){pm.expect(a.length).to.be.above(0);}); if(a.length){const s=a.find(x=>x.code==='PROFESSIONAL')||a[0];const o=a.find(x=>x.code!==s.code)||s;pm.collectionVariables.set('templateCode',s.code);pm.collectionVariables.set('otherTemplateCode',o.code);}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs",
+            "description": "Creates a profile-prefilled draft. Saves response data.cvId and data.version.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Asha Mwakalinga - Professional CV\",\n  \"templateCode\": \"{{templateCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvId',String(d.cvId)); pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get CV by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}",
+            "description": "Reads the new draft and refreshes cvVersion."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save Personal Info",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/personal-info",
+            "description": "Saves personal details. dateOfBirth is a YYYY-MM-DD string.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Asha\",\n  \"lastName\": \"Mwakalinga\",\n  \"contactEmail\": \"asha.mwakalinga@example.co.tz\",\n  \"phone\": \"+255 712 345 678\",\n  \"alternatePhone\": \"+255 754 321 098\",\n  \"headline\": \"Senior Accountant | Financial Reporting\",\n  \"professionalSummary\": \"Results-focused accountant with experience in financial reporting, budgeting, and audit coordination.\",\n  \"nationality\": \"Tanzanian\",\n  \"currentLocation\": \"Dar es Salaam, Tanzania\",\n  \"regionName\": \"Dar es Salaam\",\n  \"districtName\": \"Kinondoni\",\n  \"addressLine\": \"Mikocheni, Dar es Salaam\",\n  \"profilePictureUrl\": \"https://example.com/asha-profile.jpg\",\n  \"dateOfBirth\": \"1994-04-12\",\n  \"gender\": \"Female\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save Experience",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/experience",
+            "description": "Saves experience as a JSON array; LocalDate fields use YYYY-MM-DD.",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"companyName\": \"Pwani Supplies Limited\",\n    \"jobTitle\": \"Senior Accountant\",\n    \"employmentTypeName\": \"Full-time\",\n    \"location\": \"Dar es Salaam, Tanzania\",\n    \"description\": \"Prepared monthly management accounts and supported annual audits.\",\n    \"startDate\": \"2021-06-01\",\n    \"endDate\": null,\n    \"current\": true,\n    \"sortOrder\": 1\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save Education",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/education",
+            "description": "Saves education as a JSON array; LocalDate fields use YYYY-MM-DD.",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"educationLevelName\": \"Bachelor's Degree\",\n    \"institutionName\": \"University of Dar es Salaam\",\n    \"qualification\": \"Bachelor of Commerce in Accounting\",\n    \"fieldOfStudy\": \"Accounting\",\n    \"grade\": \"Upper Second Class\",\n    \"startDate\": \"2013-10-01\",\n    \"endDate\": \"2016-07-31\",\n    \"current\": false,\n    \"sortOrder\": 1\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save Skills",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/skills",
+            "description": "Saves skills as a JSON array. Proficiency is free text in this request DTO.",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"skillName\": \"Financial Reporting\",\n    \"proficiency\": \"ADVANCED\",\n    \"yearsExperience\": 6.0,\n    \"sortOrder\": 1\n  },\n  {\n    \"skillName\": \"Microsoft Excel\",\n    \"proficiency\": \"ADVANCED\",\n    \"yearsExperience\": 7.0,\n    \"sortOrder\": 2\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save Certifications",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/certifications",
+            "description": "Saves certifications as a JSON array.",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"certificationName\": \"Certified Public Accountant (CPA-T)\",\n    \"issuingOrganization\": \"National Board of Accountants and Auditors\",\n    \"credentialId\": \"CPA-T-2020-1234\",\n    \"issueDate\": \"2020-09-15\",\n    \"expiryDate\": null,\n    \"certificateUrl\": \"https://example.com/certificates/cpa-t\",\n    \"sortOrder\": 1\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save Languages",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/languages",
+            "description": "Saves languages as a JSON array.",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"languageName\": \"Swahili\",\n    \"languageCode\": \"sw\",\n    \"proficiency\": \"NATIVE\",\n    \"sortOrder\": 1\n  },\n  {\n    \"languageName\": \"English\",\n    \"languageCode\": \"en\",\n    \"proficiency\": \"FLUENT\",\n    \"sortOrder\": 2\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save Projects",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/projects",
+            "description": "Saves projects as a JSON array.",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"title\": \"Monthly Reporting Automation\",\n    \"role\": \"Project Lead\",\n    \"description\": \"Improved the monthly reporting workflow using spreadsheet templates and reconciliations.\",\n    \"projectUrl\": \"https://example.com/projects/reporting\",\n    \"startDate\": \"2023-01-01\",\n    \"endDate\": \"2023-04-30\",\n    \"sortOrder\": 1\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save References",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/references",
+            "description": "Saves references as a JSON array.",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"fullName\": \"Neema Kweka\",\n    \"jobTitle\": \"Finance Manager\",\n    \"organization\": \"Pwani Supplies Limited\",\n    \"relationship\": \"Former supervisor\",\n    \"email\": \"neema.kweka@example.co.tz\",\n    \"phone\": \"+255 713 222 111\",\n    \"sortOrder\": 1\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Save Section Configuration",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/sections",
+            "description": "Updates section visibility/order and optional title using a JSON array.",
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"sectionCode\": \"WORK_EXPERIENCE\",\n    \"visible\": true,\n    \"displayOrder\": 3,\n    \"customTitle\": \"Professional Experience\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Choose Template",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/template",
+            "description": "Chooses the template code selected from Get Templates.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateCode\": \"{{templateCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Finalize CV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/finalize",
+            "description": "Finalizes the complete draft; successful response has data.valid=true."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "pm.test('CV finalized',function(){pm.expect(pm.response.json().data.valid).to.eql(true);});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative tests",
+          "description": "Validation and boundary checks. The incomplete draft stays available for the My CVs negative tests and is cleaned up there.",
+          "item": [
+            {
+              "name": "Missing body",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/personal-info",
+                "description": "No body on a required-body endpoint; expects 400.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Malformed JSON",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/title",
+                "description": "Malformed raw JSON expects 400.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"title\":",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Missing required field",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/title",
+                "description": "Blank title violates @NotBlank; expects 400 with a field message.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"  \"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('Validation field messages are present', function () { const data=pm.response.json().data; pm.expect(data).to.be.an('object'); pm.expect(Object.keys(data)).to.have.length.above(0); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Over-length text",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/personal-info",
+                "description": "headline exceeds the DTO limit of 150 characters; expects 400 with a field message.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"firstName\": \"Asha\",\n  \"lastName\": \"Mwakalinga\",\n  \"contactEmail\": \"asha.mwakalinga@example.co.tz\",\n  \"headline\": \"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('Validation field messages are present', function () { const data=pm.response.json().data; pm.expect(data).to.be.an('object'); pm.expect(Object.keys(data)).to.have.length.above(0); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Invalid template code",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/template",
+                "description": "NOT_A_TEMPLATE violates the template code pattern; expects 400 with a field message.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"templateCode\": \"NOT_A_TEMPLATE\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('Validation field messages are present', function () { const data=pm.response.json().data; pm.expect(data).to.be.an('object'); pm.expect(Object.keys(data)).to.have.length.above(0); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Non-existent CV",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{missingCvId}}",
+                "description": "Unknown CV identifier expects 404."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 404', function () { pm.response.to.have.status(404); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Create Incomplete Draft",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs",
+                "description": "Creates the separate draft used for both module incomplete-finalize tests.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Postman Incomplete CV\",\n  \"templateCode\": \"{{templateCode}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                      "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "const d=pm.response.json().data; pm.collectionVariables.set('incompleteCvId',String(d.cvId)); pm.collectionVariables.set('incompleteVersion',String(d.version));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Make Incomplete Personal Info",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{incompleteVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{incompleteCvId}}/personal-info",
+                "description": "Leaves headline blank and supplies required name/email fields.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"firstName\": \"Asha\",\n  \"lastName\": \"Mwakalinga\",\n  \"contactEmail\": \"asha.mwakalinga@example.co.tz\",\n  \"headline\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "const d=pm.response.json().data; pm.collectionVariables.set('incompleteVersion',String(d.version));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Clear Experience",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{incompleteVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{incompleteCvId}}/experience",
+                "description": "Empty JSON array removes this required finalize section.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "[]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "const d=pm.response.json().data; pm.collectionVariables.set('incompleteVersion',String(d.version));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Clear Education",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{incompleteVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{incompleteCvId}}/education",
+                "description": "Empty JSON array removes this required finalize section.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "[]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "const d=pm.response.json().data; pm.collectionVariables.set('incompleteVersion',String(d.version));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Clear Skills",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{incompleteVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{incompleteCvId}}/skills",
+                "description": "Empty JSON array removes this required finalize section.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "[]",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "const d=pm.response.json().data; pm.collectionVariables.set('incompleteVersion',String(d.version));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Finalize Incomplete Draft",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "If-Match",
+                    "value": "{{incompleteVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{incompleteCvId}}/finalize",
+                "description": "Expects 422 and all missing finalize fields."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 422', function () { pm.response.to.have.status(422); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('All missing finalize fields are listed', function () { const e=pm.response.json().data.errors||[]; const k=e.map(x=>x.section+'.'+x.field); ['PERSONAL_INFO.headline','EXPERIENCE.experiences','EDUCATION.educations','SKILLS.skills'].forEach(x=>pm.expect(k).to.include(x)); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Page size above maximum",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs?page=0&size=1000",
+                "description": "Page size is capped at the default max-page-size of 50; expects 200 and data.size=50."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('Page size is capped at 50 by default',function(){pm.expect(pm.response.json().data.size).to.eql(50);});"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "My CVs",
+      "description": "List, read, rename, duplicate, change template, set default, download and cleanup.",
+      "item": [
+        {
+          "name": "List My CVs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs?page=0&size=10",
+            "description": "Lists CVs with supported page and size parameters. The controller has no status filter."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get CV by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}",
+            "description": "Returns the completed CV and refreshes cvVersion."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rename CV",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/title",
+            "description": "Renames with required title and current If-Match version.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Asha Mwakalinga - Finance CV\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('cvVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Duplicate CV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "If-Match",
+                "value": "{{cvVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/duplicate",
+            "description": "Creates a draft copy and stores its ID/version."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('duplicateCvId',String(d.cvId)); pm.collectionVariables.set('duplicateVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change Template",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "If-Match",
+                "value": "{{duplicateVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{duplicateCvId}}/template",
+            "description": "Changes the copy to another returned template code.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateCode\": \"{{otherTemplateCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('duplicateVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Default",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "If-Match",
+                "value": "{{duplicateVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{duplicateCvId}}/default",
+            "description": "Sets the copy as the default CV and refreshes its version."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "const d=pm.response.json().data; pm.collectionVariables.set('duplicateVersion',String(d.version));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download CV",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/download",
+            "description": "Returns PDF bytes, not a JSON ApiResponse."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                  "pm.test('Response is a PDF',function(){pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf');});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete duplicate CV (cleanup)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "If-Match",
+                "value": "{{duplicateVersion}}",
+                "type": "text"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{duplicateCvId}}",
+            "description": "Soft-deletes the duplicate created by this run."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                  "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Negative tests",
+          "description": "Validation and boundary checks, including final cleanup of the incomplete draft.",
+          "item": [
+            {
+              "name": "Missing body",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/personal-info",
+                "description": "No body on a required-body endpoint; expects 400.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Malformed JSON",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/title",
+                "description": "Malformed raw JSON expects 400.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\"title\":",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Missing required field",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/title",
+                "description": "Blank title violates @NotBlank; expects 400 with a field message.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('Validation field messages are present', function () { const data=pm.response.json().data; pm.expect(data).to.be.an('object'); pm.expect(Object.keys(data)).to.have.length.above(0); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Over-length text",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/personal-info",
+                "description": "headline exceeds 150 characters; expects 400 with a field message.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"firstName\": \"Asha\",\n  \"lastName\": \"Mwakalinga\",\n  \"contactEmail\": \"asha.mwakalinga@example.co.tz\",\n  \"headline\": \"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('Validation field messages are present', function () { const data=pm.response.json().data; pm.expect(data).to.be.an('object'); pm.expect(Object.keys(data)).to.have.length.above(0); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Invalid template code",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json",
+                    "type": "text"
+                  },
+                  {
+                    "key": "If-Match",
+                    "value": "{{cvVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{cvId}}/template",
+                "description": "Invalid template code expects 400 with a field message.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"templateCode\": \"NOT_A_TEMPLATE\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('Validation field messages are present', function () { const data=pm.response.json().data; pm.expect(data).to.be.an('object'); pm.expect(Object.keys(data)).to.have.length.above(0); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Non-existent CV",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{missingCvId}}",
+                "description": "Unknown CV identifier expects 404."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 404', function () { pm.response.to.have.status(404); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Page size above maximum",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs?page=0&size=1000",
+                "description": "Service caps page size at the default 50; expects 200."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('Page size is capped at 50 by default',function(){pm.expect(pm.response.json().data.size).to.eql(50);});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Finalize Incomplete Draft",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "If-Match",
+                    "value": "{{incompleteVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{incompleteCvId}}/finalize",
+                "description": "Repeats the 422 incomplete-draft check and asserts all missing fields."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 422', function () { pm.response.to.have.status(422); });",
+                      "pm.test('Status is never 500', function () { pm.expect(pm.response.code).to.not.eql(500); });",
+                      "pm.test('Response reports failure', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(false); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });",
+                      "pm.test('All missing finalize fields are listed', function () { const e=pm.response.json().data.errors||[]; const k=e.map(x=>x.section+'.'+x.field); ['PERSONAL_INFO.headline','EXPERIENCE.experiences','EDUCATION.educations','SKILLS.skills'].forEach(x=>pm.expect(k).to.include(x)); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Delete Incomplete Draft (cleanup)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "If-Match",
+                    "value": "{{incompleteVersion}}",
+                    "type": "text"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/jobseeker/cvs/{{incompleteCvId}}",
+                "description": "Soft-deletes the incomplete draft created in CV Builder negative tests."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+                      "pm.test('Response is JSON and success is true', function () { pm.response.to.be.json; pm.expect(pm.response.json().success).to.eql(true); });",
+                      "pm.test('Response time is below 1000 ms', function () { pm.expect(pm.response.responseTime).to.be.below(1000); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

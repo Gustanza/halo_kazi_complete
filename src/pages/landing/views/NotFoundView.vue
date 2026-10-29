@@ -1,9 +1,9 @@
 <script setup>
 import { Compass } from 'lucide-vue-next'
 import BrandLogo from '../../../components/common/BrandLogo.vue'
-import { useAuthStore } from '../../../stores/auth'
+import { useSession } from '../../../auth/session'
 
-const auth = useAuthStore()
+const session = useSession()
 </script>
 
 <template>
@@ -24,8 +24,8 @@ const auth = useAuthStore()
       <p class="mt-2 text-sm leading-relaxed" style="color: var(--color-text-muted)">
         The page you're looking for doesn't exist or may have moved.
       </p>
-      <RouterLink :to="auth.isAuthenticated.value ? '/dashboard' : '/'" class="btn-primary mt-6">
-        {{ auth.isAuthenticated.value ? 'Back to Dashboard' : 'Back to Home' }}
+      <RouterLink :to="session.isAuthenticated.value ? '/dashboard' : '/'" class="btn-primary mt-6">
+        {{ session.isAuthenticated.value ? 'Back to Dashboard' : 'Back to Home' }}
       </RouterLink>
     </div>
   </div>

@@ -99,7 +99,7 @@ Table otp_code [headercolor: #2C3E50] {
   phone varchar2(20) [not null]
   purpose varchar2(30) [not null, note: 'PHONE_VERIFICATION | PASSWORD_RESET | PHONE_CHANGE']
   code_hash varchar2(255) [not null]
-  expires_at timestamptz [not null, note: '+2 minutes']
+  expires_at timestamptz [not null, note: '+ OTP_TTL_SECONDS (currently 5 minutes)']
   resend_count number [not null, default: 0, note: 'max 3']
   attempt_count number [not null, default: 0]
   consumed_at timestamptz

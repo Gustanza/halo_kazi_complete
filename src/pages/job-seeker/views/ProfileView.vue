@@ -27,11 +27,11 @@ import {
 
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
 import Skeleton from '../../../components/ui/Skeleton.vue'
-import { useAuthStore } from '../../../stores/auth'
+import { useSession } from '../../../auth/session'
 import * as profileApi from '../../../api/profile'
 import { useToast } from '../../../composables/useToast'
 
-const auth = useAuthStore()
+const session = useSession()
 const toast = useToast()
 
 const steps = [
@@ -165,9 +165,9 @@ function displayValue(value) {
 }
 
 const personalInfo = computed(() => profileData.value.personalInfo)
-const fullName = computed(() => auth.user.value?.fullName || 'Your Name')
-const email = computed(() => auth.user.value?.email || '')
-const phone = computed(() => auth.user.value?.phone || '')
+const fullName = computed(() => session.user.value?.fullName || 'Your Name')
+const email = computed(() => session.user.value?.email || '')
+const phone = computed(() => session.user.value?.phone || '')
 
 const completedSections = computed(() => {
   let count = 0

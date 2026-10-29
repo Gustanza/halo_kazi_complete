@@ -1,27 +1,29 @@
 <script setup>
-import { reactive } from 'vue'
+import { computed } from 'vue'
 import { SlidersHorizontal, X } from 'lucide-vue-next'
 
-const filters = reactive({
-  location: '',
-  jobType: '',
-  industry: '',
-  level: '',
-  salary: '',
-  datePosted: '',
+// modelValue holds the API filter codes: { region, type, category, experience, salary, posted }.
+// lookups is the GET /api/public/lookups response (null while loading).
+const props = defineProps({
+  modelValue: { type: Object, required: true },
+  lookups: { type: Object, default: null },
 })
+const emit = defineEmits(['update:modelValue', 'clear'])
 
-const fields = [
-  { key: 'location', label: 'Location', placeholder: 'Select location' },
-  { key: 'jobType', label: 'Job Type', placeholder: 'Select job type' },
-  { key: 'industry', label: 'Industry/Sector', placeholder: 'Select industry' },
-  { key: 'level', label: 'Experience Level', placeholder: 'Select level' },
-  { key: 'salary', label: 'Salary Range', placeholder: 'Select level' },
-  { key: 'datePosted', label: 'Date Posted', placeholder: 'Select level' },
-]
+const byName = (items) => (items ?? []).map((item) => ({ value: item.code, label: item.nameEn }))
+const byLabel = (items) => (items ?? []).map((item) => ({ value: item.code, label: item.label }))
 
-function clearFilters() {
-  for (const key of Object.keys(filters)) filters[key] = ''
+const fields = computed(() => [
+  { key: 'region', label: 'Location', placeholder: 'Any location', options: byName(props.lookups?.regions) },
+  { key: 'type', label: 'Job Type', placeholder: 'Any job type', options: byName(props.lookups?.employmentTypes) },
+  { key: 'category', label: 'Industry/Sector', placeholder: 'Any industry', options: byName(props.lookups?.categories) },
+  { key: 'experience', label: 'Experience Level', placeholder: 'Any level', options: byLabel(props.lookups?.experienceLevels) },
+  { key: 'salary', label: 'Salary Range', placeholder: 'Any salary', options: byLabel(props.lookups?.salaryRanges) },
+  { key: 'posted', label: 'Date Posted', placeholder: 'Any time', options: byLabel(props.lookups?.datePosted) },
+])
+
+function update(key, value) {
+  emit('update:modelValue', { ...props.modelValue, [key]: value })
 }
 </script>
 
@@ -34,13 +36,19 @@ function clearFilters() {
 
     <div class="space-y-4">
       <div v-for="field in fields" :key="field.key">
-        <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">{{ field.label }}</label>
+        <label :for="`filter-${field.key}`" class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">
+          {{ field.label }}
+        </label>
         <select
-          v-model="filters[field.key]"
-          class="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none"
+          :id="`filter-${field.key}`"
+          :value="modelValue[field.key]"
+          :disabled="!lookups"
+          class="w-full rounded-lg border bg-transparent px-3 py-2.5 text-sm transition-colors focus:border-primary focus:outline-none disabled:opacity-60"
           style="border-color: var(--color-border); color: var(--color-text)"
+          @change="update(field.key, $event.target.value)"
         >
           <option value="">{{ field.placeholder }}</option>
+          <option v-for="option in field.options" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
       </div>
     </div>
@@ -48,7 +56,7 @@ function clearFilters() {
     <button
       type="button"
       class="press mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary-600"
-      @click="clearFilters"
+      @click="emit('clear')"
     >
       <X :size="15" />
       Clear filters

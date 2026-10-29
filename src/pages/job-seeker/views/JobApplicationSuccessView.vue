@@ -8,11 +8,11 @@ import {
 } from 'lucide-vue-next'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
 import StatusBadge from '../../../components/ui/StatusBadge.vue'
-import { useAuthStore } from '../../../stores/auth'
+import { useSession } from '../../../auth/session'
 
 const router = useRouter()
 const route = useRoute()
-const auth = useAuthStore()
+const session = useSession()
 
 const applicationId = route.query.applicationId || ''
 const jobTitle = route.query.jobTitle || 'this role'
@@ -77,7 +77,7 @@ const submittedAt = computed(() => new Date().toLocaleString('en-GB', { dateStyl
               Application Sent Successfully!
             </h3>
             <p class="text-xs text-slate-600 max-w-md">
-              Thank you, <span class="font-semibold text-slate-800">{{ auth.user.value?.fullName }}</span>. Your application for
+              Thank you, <span class="font-semibold text-slate-800">{{ session.user.value?.fullName }}</span>. Your application for
               <span class="font-semibold text-slate-800">{{ jobTitle }}</span> has been submitted to
               <span class="font-semibold text-slate-800">{{ company }}</span>.
             </p>
@@ -108,8 +108,8 @@ const submittedAt = computed(() => new Date().toLocaleString('en-GB', { dateStyl
               <span class="font-medium text-slate-700">#{{ applicationId }}</span>
             </div>
             <div>
-              <span class="text-slate-400 block">Applicant Email:</span>
-              <span class="font-medium text-slate-700">{{ auth.user.value?.email }}</span>
+              <span class="text-slate-400 block">Applicant Phone:</span>
+              <span class="font-medium text-slate-700">{{ session.user.value?.phone }}</span>
             </div>
             <div>
               <span class="text-slate-400 block">Date & Time:</span>

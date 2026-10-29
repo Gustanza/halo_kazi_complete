@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   Briefcase,
   Building2,
@@ -34,58 +34,47 @@ import EmployerCard from '../components/employers/EmployerCard.vue'
 import TemplateThumb from '../components/cv/TemplateThumb.vue'
 import StepCard from '../components/cv/StepCard.vue'
 
-import * as jobsApi from '../../../api/jobs'
-import * as cvApi from '../../../api/cv'
-import * as employersApi from '../../../api/employers'
+import { getCvTemplates, getLookups, getStats, getTopEmployers } from '../../../api/publicApi'
+import { formatCount, toEmployerCard, toTemplate } from '../data/mappers'
+import { useJobBoard } from '../composables/useJobBoard'
+import { useSavedJobs } from '../composables/useSavedJobs'
 
-const JOBS_PAGE_SIZE = 5
-const currentPage = ref(1)
-const jobs = ref([])
-const totalJobPages = ref(1)
+// ---- live data (GET /api/public/*) ----
+const stats = ref(null)
+const lookups = ref(null)
 const employers = ref([])
-
-async function loadEmployers() {
-  employers.value = await employersApi.listTopEmployers({ limit: 5 })
-}
-
-async function loadJobs() {
-  const result = await jobsApi.listJobs({ page: currentPage.value, pageSize: JOBS_PAGE_SIZE })
-  // JobCard.vue expects {initials, brandColor, type} - keep that contract and just adapt
-  // the vacancy-shaped api response to it here, instead of touching the shared card.
-  jobs.value = result.items.map((job) => ({
-    id: job.id,
-    title: job.title,
-    company: job.company,
-    initials: job.companyInitials,
-    brandColor: job.companyColor,
-    location: job.location,
-    type: job.employmentType,
-  }))
-  totalJobPages.value = Math.max(1, Math.ceil(result.total / JOBS_PAGE_SIZE))
-}
-
-watch(currentPage, loadJobs)
-
 const cvTemplates = ref([])
-const selectedTemplate = ref(null)
 
-async function loadCvTemplates() {
-  cvTemplates.value = await cvApi.listTemplates()
-  selectedTemplate.value = cvTemplates.value[0]?.id ?? null
+const board = useJobBoard({ pageSize: 5 })
+const { filters, page: currentPage, jobs, totalItems, totalPages, loading: jobsLoading, error: jobsError } = board
+const saved = useSavedJobs()
+
+/** Loads one section; a failure leaves that section empty instead of breaking the page. */
+async function loadInto(target, request, map = (x) => x) {
+  try {
+    target.value = map(await request())
+  } catch (error) {
+    console.warn('[landing]', error.message)
+  }
 }
 
 onMounted(() => {
-  loadJobs()
-  loadCvTemplates()
-  loadEmployers()
+  board.load()
+  saved.load()
+  loadInto(stats, getStats)
+  loadInto(lookups, getLookups)
+  loadInto(employers, () => getTopEmployers(5), (list) => list.map(toEmployerCard))
+  loadInto(cvTemplates, getCvTemplates, (list) => list.map(toTemplate)).then(() => {
+    selectedTemplate.value ??= cvTemplates.value[0]?.id ?? null
+  })
 })
 
-const heroStats = [
-  { icon: Briefcase, value: '10K+', label: 'New jobs every day' },
-  { icon: Building2, value: '5K+', label: 'Registered employers' },
-  { icon: Users, value: '50K+', label: 'Job seekers' },
+const heroStats = computed(() => [
+  { icon: Briefcase, value: formatCount(stats.value?.openJobs), label: 'Open jobs' },
+  { icon: Building2, value: formatCount(stats.value?.employers), label: 'Registered employers' },
+  { icon: Users, value: formatCount(stats.value?.jobSeekers), label: 'Job seekers' },
   { icon: Clock3, value: '24/7', label: 'Support' },
-]
+])
 
 const helpFeatures = [
   { icon: UserRound, iconBg: '#FD5C20', title: 'Search Jobs', description: 'Search thousands of jobs from various companies' },
@@ -101,6 +90,8 @@ const whyEmployerFeatures = [
   { icon: ShieldCheck, iconBg: '#FD5C20', title: 'Trusted platform', description: 'Verified employers and secure hiring process you can rely on' },
 ]
 
+const selectedTemplate = ref(null)
+
 const cvSteps = [
   { icon: LayoutTemplate, title: 'Choose template', description: 'Pick a professional template you like' },
   { icon: UserRound, title: 'Add your details', description: 'Fill in your personal information, experience, education and skills' },
@@ -108,12 +99,12 @@ const cvSteps = [
   { icon: Download, title: 'Download & share', description: 'Download your CV as a PDF and start sharing' },
 ]
 
-const aboutStats = [
-  { icon: Users, value: '50K+', label: 'Job Seekers', sub: 'Trust Halokazi' },
-  { icon: Building2, value: '5K+', label: 'Companies', sub: 'Hiring on Halokazi' },
-  { icon: Briefcase, value: '10K+', label: 'Jobs posted', sub: 'Every month' },
+const aboutStats = computed(() => [
+  { icon: Users, value: formatCount(stats.value?.jobSeekers), label: 'Job Seekers', sub: 'Trust Halokazi' },
+  { icon: Building2, value: formatCount(stats.value?.employers), label: 'Companies', sub: 'Hiring on Halokazi' },
+  { icon: Briefcase, value: formatCount(stats.value?.jobsPostedLast30Days), label: 'Jobs posted', sub: 'In the last 30 days' },
   { icon: Smile, value: '98%', label: 'Employer', sub: 'Satisfaction Rate' },
-]
+])
 </script>
 
 <template>
@@ -146,7 +137,8 @@ const aboutStats = [
         </div>
 
         <div class="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-4">
-          <StatPill v-for="stat in heroStats" :key="stat.label" v-bind="stat" />
+          <!-- keyed on the value so the count-up animation replays once live numbers arrive -->
+          <StatPill v-for="stat in heroStats" :key="stat.label + stat.value" v-bind="stat" />
         </div>
       </div>
 
@@ -231,16 +223,46 @@ const aboutStats = [
 
       <div class="mt-10 grid gap-8 lg:grid-cols-3">
         <div class="lg:col-span-2">
-          <h3 class="mb-4 text-lg font-semibold" style="color: var(--color-text)">New Jobs</h3>
-          <div class="space-y-4">
-            <JobCard v-for="(job, i) in jobs" :key="job.id" :job="job" v-reveal="i * 70" />
+          <div class="mb-4 flex items-baseline justify-between gap-4">
+            <h3 class="text-lg font-semibold" style="color: var(--color-text)">New Jobs</h3>
+            <span v-if="!jobsError && totalItems" class="text-sm" style="color: var(--color-text-muted)">
+              {{ totalItems }} open job{{ totalItems === 1 ? '' : 's' }}
+            </span>
           </div>
+
+          <div v-if="jobsError" class="card-surface p-6 text-center">
+            <p class="text-sm font-medium" style="color: var(--color-text)">We couldn't load jobs right now.</p>
+            <p class="mt-1 text-xs" style="color: var(--color-text-muted)">{{ jobsError.message }}</p>
+            <button type="button" class="btn-outline mt-4" @click="board.load()">Try again</button>
+          </div>
+          <div v-else-if="!jobsLoading && jobs.length === 0" class="card-surface p-6 text-center">
+            <p class="text-sm font-medium" style="color: var(--color-text)">No jobs match these filters.</p>
+            <button type="button" class="btn-outline mt-4" @click="board.clearFilters()">Clear filters</button>
+          </div>
+          <div v-else class="space-y-4 transition-opacity" :class="jobsLoading ? 'opacity-60' : ''" :aria-busy="jobsLoading">
+            <JobCard
+              v-for="(job, i) in jobs"
+              :key="job.id"
+              :job="job"
+              :saved="saved.isSaved(job.id)"
+              :saveable="saved.canSave.value"
+              v-reveal="i * 70"
+              @toggle-save="saved.toggle"
+            />
+          </div>
+
           <div class="mt-8">
-            <Pagination v-model="currentPage" :total="totalJobPages" />
+            <Pagination v-model="currentPage" :total="totalPages" />
           </div>
         </div>
 
-        <FilterSidebar v-reveal="100" />
+        <FilterSidebar
+          :model-value="filters"
+          :lookups="lookups"
+          v-reveal="100"
+          @update:model-value="Object.assign(filters, $event)"
+          @clear="board.clearFilters()"
+        />
       </div>
     </div>
   </section>
@@ -279,7 +301,7 @@ const aboutStats = [
             </div>
           </div>
           <div class="absolute left-5 top-5 rounded-full px-3 py-1.5 text-[11px] font-bold shadow-card" style="background-color: var(--color-surface); color: var(--color-text)">
-            20+ Jobs Open
+            {{ stats ? `${formatCount(stats.openJobs)} Jobs Open` : 'Jobs Open' }}
           </div>
         </div>
       </div>
@@ -411,7 +433,7 @@ const aboutStats = [
             <component :is="stat.icon" :size="20" />
           </div>
           <p class="text-2xl font-extrabold" style="color: var(--color-text)">
-            <CountUpValue :value="stat.value" />
+            <CountUpValue :key="stat.value" :value="stat.value" />
           </p>
           <p class="text-sm font-medium" style="color: var(--color-text)">{{ stat.label }}</p>
           <p class="text-xs" style="color: var(--color-text-muted)">{{ stat.sub }}</p>

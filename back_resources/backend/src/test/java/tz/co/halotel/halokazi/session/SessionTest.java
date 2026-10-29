@@ -6,15 +6,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
 import tz.co.halotel.halokazi.support.AbstractIntegrationTest;
 
 /** AUTH-12: bearer sessions, idle timeout, absolute expiry, revocation, public routes. */
 class SessionTest extends AbstractIntegrationTest {
+
+    @Autowired
+    private Clock clock;
 
     @Test
     void missingOrMalformedBearerIs401() throws Exception {
@@ -54,8 +60,10 @@ class SessionTest extends AbstractIntegrationTest {
     @Test
     void exactlyTenMinutesIdleIsExpired() throws Exception {
         Active a = registerAndVerify("JOB_SEEKER");
-        exec("update user_session set last_activity_at = systimestamp - interval '10' minute where user_id = ?",
-                a.userId());
+        // The app's clock, not the database's: the shared DB runs on another machine whose clock can differ
+        // by a fraction of a second, which matters exactly at the boundary.
+        exec("update user_session set last_activity_at = ? where user_id = ?",
+                OffsetDateTime.now(clock).minusMinutes(10), a.userId());
         me(a.token()).andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("SESSION_EXPIRED"));
     }
 

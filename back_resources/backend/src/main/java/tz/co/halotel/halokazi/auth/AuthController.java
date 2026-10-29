@@ -10,11 +10,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 import tz.co.halotel.halokazi.auth.dto.AuthResponse;
+import tz.co.halotel.halokazi.auth.dto.ForgotPasswordRequest;
 import tz.co.halotel.halokazi.auth.dto.LoginRequest;
 import tz.co.halotel.halokazi.auth.dto.RegisterRequest;
 import tz.co.halotel.halokazi.auth.dto.RegisterResponse;
 import tz.co.halotel.halokazi.auth.dto.ResendOtpRequest;
 import tz.co.halotel.halokazi.auth.dto.ResendOtpResponse;
+import tz.co.halotel.halokazi.auth.dto.ResetPasswordRequest;
 import tz.co.halotel.halokazi.auth.dto.UserView;
 import tz.co.halotel.halokazi.auth.dto.VerifyOtpRequest;
 import tz.co.halotel.halokazi.common.web.ClientInfo;
@@ -27,10 +29,12 @@ public class AuthController {
 
     private final RegistrationService registration;
     private final AuthService auth;
+    private final PasswordResetService passwordReset;
 
-    public AuthController(RegistrationService registration, AuthService auth) {
+    public AuthController(RegistrationService registration, AuthService auth, PasswordResetService passwordReset) {
         this.registration = registration;
         this.auth = auth;
+        this.passwordReset = passwordReset;
     }
 
     @PostMapping("/register")
@@ -48,6 +52,18 @@ public class AuthController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ResendOtpResponse resendOtp(@Valid @RequestBody ResendOtpRequest request, ClientInfo client) {
         return registration.resendVerificationCode(request, client);
+    }
+
+    @PostMapping("/password/forgot")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ResendOtpResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, ClientInfo client) {
+        return passwordReset.requestReset(request, client);
+    }
+
+    @PostMapping("/password/reset")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request, ClientInfo client) {
+        passwordReset.resetPassword(request, client);
     }
 
     @PostMapping("/login")

@@ -137,7 +137,7 @@ CREATE TABLE profile_section (
     CONSTRAINT ck_profile_section_active CHECK (is_active IN (0, 1))
 );
 
--- Tunable business values (75% threshold, OTP 2 min, 3 resends, 10 min session, 14-day drafts ...)
+-- Tunable business values (75% threshold, OTP lifetime, 3 resends, 10 min session, 14-day drafts ...)
 CREATE TABLE system_setting (
     setting_key      VARCHAR2(60)   NOT NULL,
     setting_value    VARCHAR2(400)  NOT NULL,
@@ -302,7 +302,7 @@ CREATE TABLE otp_code (
     phone            VARCHAR2(20)  NOT NULL,
     purpose          VARCHAR2(30)  NOT NULL,
     code_hash        VARCHAR2(255) NOT NULL,
-    expires_at       TIMESTAMP WITH TIME ZONE NOT NULL,     -- created_at + 2 minutes
+    expires_at       TIMESTAMP WITH TIME ZONE NOT NULL,     -- created_at + OTP_TTL_SECONDS
     resend_count     NUMBER(2)     DEFAULT 0 NOT NULL,       -- max 3 within the control window
     attempt_count    NUMBER(3)     DEFAULT 0 NOT NULL,
     consumed_at      TIMESTAMP WITH TIME ZONE,

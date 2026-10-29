@@ -1,0 +1,1481 @@
+{
+  "info": {
+    "_postman_id": "halokazi-jobseeker-profile-v1",
+    "name": "HaloKazi - Jobseeker Profile API",
+    "description": "Comprehensive Postman collection for testing the verified HaloKazi Jobseeker Profile backend REST APIs. Includes database connectivity testing and all 11 Jobseeker profile sections.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "profileId",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00. Database Connection & System Health",
+      "item": [
+        {
+          "name": "Check Oracle DB Connection",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/db-test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "db-test"
+              ]
+            },
+            "description": "Verifies live Oracle database connectivity by executing SELECT 1 FROM DUAL. Returns {\"status\":\"connected\"} on success."
+          },
+          "response": []
+        },
+        {
+          "name": "Spring Boot Actuator Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health"
+              ]
+            },
+            "description": "Checks Spring Boot actuator health including readiness and liveness."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "01. Profile Management",
+      "item": [
+        {
+          "name": "Get Current Profile (Default ID: 1)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile"
+              ]
+            },
+            "description": "Retrieves the default profile (John Mwangi, profileId 1)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile/{{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile",
+                "{{profileId}}"
+              ]
+            },
+            "description": "Retrieves profile by specific ID. Returns 404 if profile not found."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile Composite Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile/detail",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile",
+                "detail"
+              ]
+            },
+            "description": "Returns full composite profile: personal info, strength score, education, work, skills, certifications, languages, projects, references, stats, and recommended jobs."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Personal Details",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Mwangi\",\n  \"dateOfBirth\": \"1995-08-15\",\n  \"gender\": \"Male\",\n  \"nationality\": \"Tanzanian\",\n  \"currentLocation\": \"Dar es Salaam, Tanzania\",\n  \"regionId\": 1,\n  \"regionName\": \"Dar es Salaam\",\n  \"districtId\": 101,\n  \"districtName\": \"Ilala\",\n  \"addressLine\": \"Samora Avenue, Posta Mpya\",\n  \"contactEmail\": \"john.mwangi@example.com\",\n  \"phone\": \"+255 712 345 678\",\n  \"alternatePhone\": \"+255 765 987 321\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile/personal-details",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile",
+                "personal-details"
+              ]
+            },
+            "description": "Updates jobseeker personal info cards (Name, DOB, Location, Phone, Email)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Headline & Professional Summary",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"headline\": \"Senior Full Stack Software Engineer & Cloud Architect\",\n  \"professionalSummary\": \"Results-driven Software Engineer with 6+ years of hands-on experience designing, developing, and deploying resilient enterprise applications using Java, Spring Boot, Vue.js, and Cloud Infrastructure.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile/headline-summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile",
+                "headline-summary"
+              ]
+            },
+            "description": "Updates candidate headline banner and professional summary text."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile Visibility",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"visibility\": \"Public\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile/visibility",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile",
+                "visibility"
+              ]
+            },
+            "description": "Toggles profile visibility between 'Public' and 'Private'."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile Picture",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pictureUrl\": \"https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile/picture",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile",
+                "picture"
+              ]
+            },
+            "description": "Updates profile avatar URL."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Profile Strength Calculation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile/strength",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile",
+                "strength"
+              ]
+            },
+            "description": "Calculates overall completion percentage, section weights, and missing recommendations."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile",
+                "stats"
+              ]
+            },
+            "description": "Returns counts for applied jobs, saved jobs, active alerts, and CVs."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Recommended Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/profile/recommendations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "profile",
+                "recommendations"
+              ]
+            },
+            "description": "Returns matching job recommendations for the jobseeker."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02. Education",
+      "item": [
+        {
+          "name": "List Education Records",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/education?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "education"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns list of education qualifications for the specified profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Education Record",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institutionName\": \"University of Dar es Salaam\",\n  \"qualification\": \"Bachelor of Science in Computer Science\",\n  \"educationLevelId\": 4,\n  \"educationLevelName\": \"Bachelor Degree\",\n  \"fieldOfStudy\": \"Computer Science\",\n  \"grade\": \"First Class Honours\",\n  \"startDate\": \"2019-10-01\",\n  \"endDate\": \"2022-11-30\",\n  \"current\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/education?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "education"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Creates an education record and recalculates profile completion percentage."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Education Record",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institutionName\": \"University of Dar es Salaam\",\n  \"qualification\": \"BSc in Computer Science (Updated)\",\n  \"fieldOfStudy\": \"Software Engineering\",\n  \"grade\": \"First Class\",\n  \"startDate\": \"2019-10-01\",\n  \"endDate\": \"2022-11-30\",\n  \"current\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/education/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "education",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Updates an existing education record by educationId."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Education Record",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/education/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "education",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Deletes an education record by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03. Work Experience",
+      "item": [
+        {
+          "name": "List Work Experiences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/work-experience?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "work-experience"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns list of work experience entries."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Work Experience",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"Halotel Tanzania PLC\",\n  \"jobTitle\": \"Full Stack Software Engineer\",\n  \"employmentTypeId\": 1,\n  \"employmentTypeName\": \"Full-time\",\n  \"location\": \"Dar es Salaam, Tanzania\",\n  \"description\": \"Led development of core telecom customer portal using Spring Boot and microservices architecture.\",\n  \"startDate\": \"2023-01-15\",\n  \"endDate\": null,\n  \"current\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/work-experience?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "work-experience"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Creates a new work experience record."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Work Experience",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"Halotel Tanzania PLC\",\n  \"jobTitle\": \"Lead Software Engineer\",\n  \"employmentTypeName\": \"Full-time\",\n  \"location\": \"Dar es Salaam\",\n  \"description\": \"Promoted to Lead Engineer managing a squad of 5 engineers.\",\n  \"startDate\": \"2023-01-15\",\n  \"endDate\": null,\n  \"current\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/work-experience/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "work-experience",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Updates an existing work experience record."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Work Experience",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/work-experience/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "work-experience",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Deletes a work experience record by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04. Skills",
+      "item": [
+        {
+          "name": "List Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/skills?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "skills"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns list of skills attached to the profile."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skillId\": 205,\n  \"skillName\": \"Java & Spring Boot\",\n  \"proficiency\": \"EXPERT\",\n  \"yearsExperience\": 5.5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/skills?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "skills"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Adds a technical or professional skill with proficiency level."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Skill",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/skills/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "skills",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Removes a skill from the profile."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05. Certifications",
+      "item": [
+        {
+          "name": "List Certifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/certifications?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "certifications"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns candidate certifications."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Certification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"certificationName\": \"Oracle Certified Professional: Java SE 21 Developer\",\n  \"issuingOrganization\": \"Oracle University\",\n  \"credentialId\": \"OCP-JAVA-21-99882\",\n  \"issueDate\": \"2024-03-15\",\n  \"expiryDate\": \"2027-03-15\",\n  \"certificateUrl\": \"https://catalog-education.oracle.com/pls/certview\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/certifications?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "certifications"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Adds a professional certification."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Certification",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"certificationName\": \"Oracle Certified Professional: Java SE 21 Developer\",\n  \"issuingOrganization\": \"Oracle University\",\n  \"credentialId\": \"OCP-JAVA-21-VERIFIED\",\n  \"issueDate\": \"2024-03-15\",\n  \"expiryDate\": \"2028-03-15\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/certifications/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "certifications",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Updates an existing certification."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Certification",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/certifications/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "certifications",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Deletes a certification by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06. Languages",
+      "item": [
+        {
+          "name": "List Languages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/languages?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "languages"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns candidate spoken languages."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Language",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"languageId\": 2,\n  \"languageName\": \"Swahili\",\n  \"proficiency\": \"NATIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/languages?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "languages"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Adds a language entry with proficiency (BASIC, CONVERSATIONAL, FLUENT, NATIVE)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Language",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/languages/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "languages",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Removes a language entry from the profile."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07. Projects",
+      "item": [
+        {
+          "name": "List Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/projects?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "projects"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns portfolio projects."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Halo Kazi Job Portal\",\n  \"role\": \"Lead Backend Architect\",\n  \"description\": \"Designed high-performance job application processing pipeline handling 50k daily active job seekers.\",\n  \"projectUrl\": \"https://github.com/halotel/halokazi\",\n  \"startDate\": \"2024-01-01\",\n  \"endDate\": \"2024-06-30\",\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/projects?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "projects"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Adds a portfolio project record."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/projects/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "projects",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Deletes a project record by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "08. References",
+      "item": [
+        {
+          "name": "List References",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/references?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "references"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns professional references."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Reference",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Dr. Joseph K. Mrema\",\n  \"jobTitle\": \"Head of Computer Science\",\n  \"organization\": \"University of Dar es Salaam\",\n  \"relationship\": \"Academic Advisor\",\n  \"email\": \"mrema@udsm.ac.tz\",\n  \"phone\": \"+255 754 112 233\",\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/references?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "references"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Adds a professional reference."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Reference",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/references/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "references",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Deletes a reference record by ID."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "09. Saved Jobs",
+      "item": [
+        {
+          "name": "List Saved Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/saved-jobs?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "saved-jobs"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns bookmarked vacancies."
+          },
+          "response": []
+        },
+        {
+          "name": "Save / Bookmark Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vacancyId\": 105,\n  \"jobTitle\": \"Cloud Infrastructure Engineer\",\n  \"companyName\": \"Halotel Tanzania\",\n  \"location\": \"Dar es Salaam\",\n  \"employmentType\": \"Full-time\",\n  \"salaryRange\": \"TZS 3,500,000 - 5,000,000\",\n  \"deadline\": \"2026-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/saved-jobs?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "saved-jobs"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Bookmarks a job vacancy."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Saved Job",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/saved-jobs/101?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "saved-jobs",
+                "101"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Removes a bookmarked job by vacancyId."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10. Job Applications",
+      "item": [
+        {
+          "name": "List Submitted Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/applications?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "applications"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns candidate submitted applications."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Application by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/applications/1?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "applications",
+                "1"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns application details by applicationId."
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Job Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vacancyId\": 102,\n  \"cvId\": 1,\n  \"coverLetter\": \"Dear Hiring Committee, I am thrilled to submit my application for the Software Engineer vacancy. With strong foundations in Spring Boot and Oracle database integrations, I look forward to contributing immediately.\",\n  \"requirementsConfirmed\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/applications?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "applications"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Submits a job application for a vacancy."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "11. Job Alerts",
+      "item": [
+        {
+          "name": "Get Alert Preferences",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/alerts?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Returns candidate job alert notification preferences."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Alert Preferences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true,\n  \"receiveEmailAlerts\": true,\n  \"receiveSmsAlerts\": true,\n  \"frequency\": \"INSTANT\",\n  \"keywords\": [\"Java\", \"Spring Boot\", \"Cloud Architect\"],\n  \"preferredLocations\": [\"Dar es Salaam\", \"Remote\"],\n  \"preferredCategories\": [\"Technology & Telecommunications\"],\n  \"minSalary\": 3000000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/alerts?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "alerts"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Updates alert keywords, locations, categories, and channels."
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle Job Alerts",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobseeker/alerts/toggle?profileId={{profileId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "jobseeker",
+                "alerts",
+                "toggle"
+              ],
+              "query": [
+                {
+                  "key": "profileId",
+                  "value": "{{profileId}}"
+                }
+              ]
+            },
+            "description": "Quick toggle to switch job alerts between ON and OFF."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,16 @@
 <script setup>
-import { Construction } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Construction, LogOut } from 'lucide-vue-next'
 import BrandLogo from './BrandLogo.vue'
+import { useSession } from '../../auth/session'
+
+const router = useRouter()
+const session = useSession()
+
+async function logOut() {
+  await session.logout()
+  router.replace('/login')
+}
 
 defineProps({
   portalName: { type: String, required: true },
@@ -24,7 +34,15 @@ defineProps({
       </div>
       <h1 class="mt-5 text-2xl font-extrabold" style="color: var(--color-text)">{{ portalName }} portal</h1>
       <p class="mt-2 text-sm leading-relaxed" style="color: var(--color-text-muted)">{{ description }}</p>
-      <RouterLink to="/" class="btn-primary mt-6">Back to Home</RouterLink>
+      <p v-if="session.user.value" class="mt-4 text-xs" style="color: var(--color-text-muted)">
+        Signed in as <span class="font-semibold" style="color: var(--color-text)">{{ session.user.value.fullName }}</span>
+      </p>
+      <div class="mt-6 flex flex-wrap justify-center gap-3">
+        <RouterLink to="/" class="btn-primary">Back to Home</RouterLink>
+        <button v-if="session.isAuthenticated.value" type="button" class="btn-outline" @click="logOut">
+          <LogOut :size="16" /> Log out
+        </button>
+      </div>
     </div>
   </div>
 </template>
