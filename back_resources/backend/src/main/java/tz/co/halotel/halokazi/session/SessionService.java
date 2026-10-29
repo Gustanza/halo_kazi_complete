@@ -75,6 +75,16 @@ public class SessionService {
         repository.findById(sessionId).ifPresent(s -> s.revoke(reason, OffsetDateTime.now(clock)));
     }
 
+    /** Ends every other open session of the user, e.g. other devices after a password change. */
+    public int revokeOthers(Long userId, Long keepSessionId, RevokeReason reason) {
+        return repository.revokeOthers(userId, keepSessionId, reason, OffsetDateTime.now(clock));
+    }
+
+    /** Ends every open session of the user, e.g. after a password reset. */
+    public int revokeAll(Long userId, RevokeReason reason) {
+        return repository.revokeAll(userId, reason, OffsetDateTime.now(clock));
+    }
+
     private Duration idleTimeout() {
         return settings.getMinutes(Setting.SESSION_IDLE_TIMEOUT_MINUTES);
     }

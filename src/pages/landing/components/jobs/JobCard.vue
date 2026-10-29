@@ -1,10 +1,14 @@
 <script setup>
-import { ref } from 'vue'
 import { MapPin, Briefcase, Bookmark } from 'lucide-vue-next'
 import CompanyBadge from '../../../../components/common/CompanyBadge.vue'
 
-defineProps({ job: { type: Object, required: true } })
-const saved = ref(false)
+// The parent owns the saved state (it is stored per job seeker by the API); this card only reports clicks.
+defineProps({
+  job: { type: Object, required: true },
+  saved: { type: Boolean, default: false },
+  saveable: { type: Boolean, default: true },
+})
+defineEmits(['toggle-save'])
 </script>
 
 <template>
@@ -23,11 +27,13 @@ const saved = ref(false)
       </div>
     </div>
     <button
+      v-if="saveable"
       type="button"
       class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition hover:border-primary hover:text-primary active:scale-90"
       :style="{ borderColor: 'var(--color-border)', color: saved ? '#FD5C20' : 'var(--color-text-muted)' }"
       :aria-label="saved ? 'Remove from saved jobs' : 'Save job'"
-      @click="saved = !saved"
+      :aria-pressed="saved"
+      @click="$emit('toggle-save', job.id)"
     >
       <Bookmark :size="16" :fill="saved ? '#FD5C20' : 'none'" />
     </button>

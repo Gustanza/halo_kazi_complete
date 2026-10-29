@@ -25,12 +25,16 @@ public enum ErrorCode {
     ACCOUNT_LOCKED(HttpStatus.LOCKED, "Too many failed login attempts. Your account is temporarily locked."),
     PHONE_NOT_VERIFIED(HttpStatus.FORBIDDEN, "Verify your phone number before logging in."),
     ACCOUNT_DISABLED(HttpStatus.FORBIDDEN, "This account is not active. Contact support."),
+    JOB_SEEKERS_ONLY(HttpStatus.FORBIDDEN, "This is only available to job seeker accounts."),
+    CURRENT_PASSWORD_INCORRECT(HttpStatus.BAD_REQUEST, "Your current password is incorrect."),
 
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "You need to log in."),
     SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "Your session has expired. Please log in again."),
 
     NOT_FOUND(HttpStatus.NOT_FOUND, "Resource not found."),
+    JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "This job does not exist or is no longer open."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "HTTP method not supported for this endpoint."),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Send the request body as JSON (Content-Type: application/json)."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong. Please try again.");
 
     private final HttpStatus status;

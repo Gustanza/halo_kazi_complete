@@ -1,8 +1,3 @@
-export const currentUser = {
-  firstName: 'Raymond',
-  fullName: 'Raymond Mwangi',
-}
-
 export const stats = [
   { key: 'applications', value: 7, label: 'Applications', to: '/dashboard/applications', color: '#2F8FF5' },
   { key: 'saved', value: 4, label: 'Saved Jobs', to: '/dashboard/saved-jobs', color: '#2FB573' },

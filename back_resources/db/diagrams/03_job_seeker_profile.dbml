@@ -15,6 +15,15 @@ Table job_seeker_profile [headercolor: #16A085] {
   profile_picture_file_id number [ref: > stored_file.file_id]
   expected_salary_min number(14,2)
   receive_job_alerts bool [not null, default: 1]
+  // added by oracle/05_settings.sql (Settings screen)
+  date_of_birth date
+  gender varchar2(20) [note: 'MALE | FEMALE | OTHER | PREFER_NOT_TO_SAY']
+  notify_email bool [not null, default: 1]
+  notify_application_updates bool [not null, default: 1]
+  notify_newsletter bool [not null, default: 0]
+  profile_visible bool [not null, default: 1, note: 'employers may discover the profile']
+  show_email bool [not null, default: 0]
+  show_phone bool [not null, default: 0]
   completion_percentage number(5,2) [not null, default: 0, note: 'cached; live value = hk_profile_completion()']
   completion_updated_at timestamptz
   created_at timestamptz [not null]

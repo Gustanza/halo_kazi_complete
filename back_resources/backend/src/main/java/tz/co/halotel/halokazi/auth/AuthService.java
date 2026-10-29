@@ -3,7 +3,6 @@ package tz.co.halotel.halokazi.auth;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.Optional;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,8 +17,6 @@ import tz.co.halotel.halokazi.auth.dto.UserView;
 import tz.co.halotel.halokazi.common.error.ApiException;
 import tz.co.halotel.halokazi.common.error.BusinessTransaction;
 import tz.co.halotel.halokazi.common.error.ErrorCode;
-import tz.co.halotel.halokazi.common.util.Emails;
-import tz.co.halotel.halokazi.common.util.PhoneNumbers;
 import tz.co.halotel.halokazi.common.web.ClientInfo;
 import tz.co.halotel.halokazi.employer.Employer;
 import tz.co.halotel.halokazi.employer.EmployerRepository;
@@ -69,7 +66,7 @@ public class AuthService {
     public AuthResponse login(LoginRequest request, ClientInfo client) {
         OffsetDateTime now = OffsetDateTime.now(clock);
         String identifier = request.identifier();
-        AppUser user = findByIdentifier(identifier).orElse(null);
+        AppUser user = users.findByLoginIdentifier(identifier).orElse(null);
 
         if (user == null) {
             passwordEncoder.matches(request.password(), dummyPasswordHash);
@@ -125,13 +122,6 @@ public class AuthService {
         return UserView.of(user, employers.findByUserId(user.getId())
                 .map(Employer::getVerificationStatus)
                 .orElse(null));
-    }
-
-    private Optional<AppUser> findByIdentifier(String identifier) {
-        if (Emails.looksLikeEmail(identifier)) {
-            return users.findByNormalizedEmail(Emails.normalize(identifier));
-        }
-        return PhoneNumbers.normalize(identifier).flatMap(users::findByPhone);
     }
 
     private static ApiException locked(AppUser user, OffsetDateTime now) {

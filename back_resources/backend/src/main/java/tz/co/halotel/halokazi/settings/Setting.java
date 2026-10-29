@@ -6,7 +6,7 @@ package tz.co.halotel.halokazi.settings;
  */
 public enum Setting {
 
-    OTP_TTL_SECONDS(120),
+    OTP_TTL_SECONDS(300),
     OTP_MAX_RESENDS(3),
     OTP_RESEND_WINDOW_MINUTES(30),
     SESSION_IDLE_TIMEOUT_MINUTES(10),

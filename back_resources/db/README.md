@@ -9,14 +9,19 @@ Database design for Halokazi, built from the approved Requirements baseline (12 
 | `oracle/01_schema.sql` | Tables, constraints, indexes (55 tables) |
 | `oracle/02_logic.sql` | Business-rule triggers, profile-completion function, lifecycle job, views |
 | `oracle/03_seed_reference.sql` | Settings, profile weights, regions, categories, permissions, CV templates, notification texts |
+| `oracle/04_seed_demo.sql` | Demo employers and open jobs for the public job board. Dev/test only, never production |
+| `oracle/05_settings.sql` | Job seeker settings columns: date of birth, gender, notification and privacy choices. Safe to re-run |
+| `oracle/98_hide_demo.sql` | Takes the 04 demo data off the public endpoints (rows can't be deleted) |
 | `oracle/99_drop_all.sql` | Drops everything. Dev/test only |
 | `halokazi.dbml` | Full model for dbdiagram.io (all 55 tables). Source for the diagrams below |
 | `diagrams/00_overview.dbml` | 18 core entities, keys and status only. Use this for presentations |
 | `diagrams/01..08_*.dbml` | One module per file, full detail. Grey tables are other modules, shown with their key only |
 
-Run in order: `01` → `02` → `03`. The schema user needs `CREATE TABLE, CREATE VIEW, CREATE SEQUENCE, CREATE PROCEDURE, CREATE TRIGGER, CREATE JOB`.
+Run in order: `01` → `02` → `03` → `05` (plus `04` on development databases only). The schema user needs `CREATE TABLE, CREATE VIEW, CREATE SEQUENCE, CREATE PROCEDURE, CREATE TRIGGER, CREATE JOB`.
 
 **Tested 27 Oct 2026** on Oracle AI Database 26ai Free (23.26.3) as user `HALOKAZI` in `FREEPDB1`. All three scripts ran with zero errors: 55 tables, 104 indexes, 13 triggers, 2 functions, 2 procedures and 5 views, all VALID; the scheduler job is enabled; 126 reference rows were loaded. The trigger logic has compiled but has not yet been exercised with test data. Not yet run on 19c.
+
+**28-29 Oct 2026:** `04_seed_demo.sql` and `05_settings.sql` applied to the shared development database (VPS). `05` is required by the backend: it maps the new columns and starts with `ddl-auto=validate`.
 
 ## Design decisions
 
@@ -42,7 +47,7 @@ Renamed from the Stage 5 ERD: `USER` → `app_user` (reserved word), `LANGUAGE` 
 
 | Requirement | Enforcement |
 |---|---|
-| AUTH-02/03 SMS OTP, 2 min, 3 resends | `otp_code` (hash only, `resend_count ≤ 3`); timing in APP using settings |
+| AUTH-02/03 SMS OTP, 3 resends; lifetime from `OTP_TTL_SECONDS` (5 min; the requirement says 2 - update it if 5 stays) | `otp_code` (hash only, `resend_count ≤ 3`); timing in APP using settings |
 | AUTH-04 login by email or phone | DB unique on `LOWER(email)` and `phone` |
 | AUTH-07/08/09 employer pending/rejected/resubmit | `employer.verification_status`; TRG blocks vacancy creation unless APPROVED + ACTIVE |
 | AUTH-11 deletion / anonymisation | `account_deletion_request`, `deleted_at`, `anonymized_at` |

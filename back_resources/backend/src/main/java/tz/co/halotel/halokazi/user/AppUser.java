@@ -140,6 +140,24 @@ public class AppUser {
         failedLoginCount = 0;
     }
 
+    /** AUTH-05: the caller has already proven the current password. */
+    public void changePassword(String newPasswordHash, OffsetDateTime now) {
+        passwordHash = newPasswordHash;
+        passwordChangedAt = now;
+    }
+
+    /** A completed password reset proves the person holds the phone, so any login lock is lifted. */
+    public void resetPassword(String newPasswordHash, OffsetDateTime now) {
+        changePassword(newPasswordHash, now);
+        failedLoginCount = 0;
+        lockedUntil = null;
+    }
+
+    /** "EN" or "SW" (ck_app_user_lang). */
+    public void changePreferredLanguage(String language) {
+        preferredLanguage = language;
+    }
+
     public boolean isPendingVerification() {
         return accountStatus == AccountStatus.PENDING_VERIFICATION;
     }

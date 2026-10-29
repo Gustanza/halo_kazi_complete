@@ -8,11 +8,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
+// First, last and the current page with its neighbours; gaps collapse into an ellipsis.
 const visiblePages = computed(() => {
-  const pages = [1, 2, 3]
-  if (props.total > 3) pages.push('ellipsis')
-  if (props.total > 3) pages.push(props.total)
-  return pages
+  const { total, modelValue: current } = props
+  const wanted = new Set([1, total, current - 1, current, current + 1])
+  const pages = [...wanted].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
+  return pages.flatMap((p, i) => (i > 0 && p - pages[i - 1] > 1 ? ['ellipsis', p] : [p]))
 })
 
 function go(page) {
@@ -22,7 +23,7 @@ function go(page) {
 </script>
 
 <template>
-  <nav class="flex items-center justify-center gap-2" aria-label="Pagination">
+  <nav v-if="total > 1" class="flex items-center justify-center gap-2" aria-label="Pagination">
     <button
       v-for="(page, idx) in visiblePages"
       :key="idx"
@@ -43,6 +44,7 @@ function go(page) {
       class="press flex h-10 w-10 items-center justify-center rounded-full border transition-colors hover:border-primary hover:text-primary"
       style="border-color: var(--color-border); color: var(--color-text)"
       aria-label="Next page"
+      :disabled="modelValue >= total"
       @click="go(Math.min(modelValue + 1, total))"
     >
       <ChevronRight :size="16" />

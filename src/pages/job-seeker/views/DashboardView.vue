@@ -5,7 +5,11 @@ import DashboardLayout from '../components/layout/DashboardLayout.vue'
 import StatCard from '../components/dashboard/StatCard.vue'
 import RecommendedJobItem from '../components/dashboard/RecommendedJobItem.vue'
 import QuickActionItem from '../components/dashboard/QuickActionItem.vue'
-import { currentUser, stats, recommendedJobs } from '../data/dashboard'
+import { stats, recommendedJobs } from '../data/dashboard'
+import { useSession } from '../../../auth/session'
+
+const session = useSession()
+const firstName = computed(() => session.user.value?.fullName?.split(/\s+/)[0] ?? '')
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
@@ -25,7 +29,7 @@ const quickActions = [
 <template>
   <DashboardLayout>
     <h1 class="text-2xl font-extrabold sm:text-3xl" style="color: var(--color-text)">
-      {{ greeting }}, {{ currentUser.firstName }}!
+      {{ greeting }}{{ firstName ? `, ${firstName}` : '' }}!
     </h1>
     <p class="mt-1 text-sm" style="color: var(--color-text-muted)">Here, what's happening with your job search today.</p>
 

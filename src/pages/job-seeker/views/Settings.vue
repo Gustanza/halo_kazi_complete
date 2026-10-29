@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   UserRound, LockKeyhole, Bell, ShieldCheck, Globe, Palette,
   CircleHelp, Camera, Save, MapPin, Settings as SettingsIcon,
@@ -8,23 +8,26 @@ import {
 } from 'lucide-vue-next'
 
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
+import * as accountApi from '../../../api/accountApi'
+import { useSession } from '../../../auth/session'
+import { useTheme } from '../../../composables/useTheme'
+
+const session = useSession()
+const { preference: themePreference, setPreference: setThemePreference } = useTheme()
 
 const activeSection = ref('account')
 const savedMessage = ref('')
+const messageTone = ref('success') // 'success' | 'error'
+const loading = ref(true)
+const loadError = ref('')
+const saving = ref(false)
 const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
-const photoPreview = ref('')
+const photoPreview = ref('') // shown once profile photos can be uploaded (no file storage yet)
 
-const account = ref({
-  fullName: 'Raymond Mwangi',
-  email: 'mwangiraymond@gmail.com',
-  phone: '+255 624023920',
-  dateOfBirth: '2001-01-12',
-  gender: 'Male',
-  location: 'Dar es Salaam, Tanzania',
-  about: 'Results-driven marketing professional with 5+ years of experience in digital marketing, brand strategy and social media management.'
-})
+// Filled from GET /api/me/settings.
+const account = ref({ fullName: '', email: '', phone: '', dateOfBirth: '', gender: '', location: '', about: '' })
 
 const password = ref({
   current: '',
@@ -45,10 +48,15 @@ const privacy = ref({
   showPhone: false
 })
 
+const LANGUAGE_LABELS = { EN: 'English', SW: 'Kiswahili' }
+const THEME_LABELS = { light: 'Light', dark: 'Dark', system: 'System' }
+const GENDER_LABELS = { MALE: 'Male', FEMALE: 'Female', OTHER: 'Other', PREFER_NOT_TO_SAY: 'Prefer not to say' }
+const NOT_PROVIDED = 'Not provided'
+
 const preferences = ref({
   language: 'English',
-  region: 'Tanzania',
-  appearance: 'Light'
+  region: 'Tanzania', // Halokazi serves Tanzania only, so region is not a saved setting
+  appearance: THEME_LABELS[themePreference.value]
 })
 
 const sections = [
@@ -78,51 +86,104 @@ const sectionTitle = computed(() =>
   sections.find(item => item.id === activeSection.value)?.label || 'Settings'
 )
 
-const aboutCount = computed(() => account.value.about.length)
+const aboutCount = computed(() => (account.value.about === NOT_PROVIDED ? 0 : account.value.about.length))
 
-function saveChanges() {
-  if (activeSection.value === 'password') {
-    if (password.value.next.length < 8) {
-      savedMessage.value = 'Password must contain at least 8 characters.'
-      return
-    }
+/** Copies a GET/PUT /api/me/settings response into the screen's state. */
+function applySettings(settings) {
+  const a = settings.account
+  const place = [a.location?.address, a.location?.district, a.location?.region?.nameEn].filter(Boolean)
+  account.value = {
+    fullName: a.fullName,
+    email: a.email,
+    phone: a.phone,
+    dateOfBirth: a.dateOfBirth || NOT_PROVIDED,
+    gender: GENDER_LABELS[a.gender] || NOT_PROVIDED,
+    location: place.length ? `${place.join(', ')}, Tanzania` : NOT_PROVIDED,
+    about: a.about || NOT_PROVIDED
+  }
+  notifications.value = {
+    email: settings.notifications.email,
+    applications: settings.notifications.applicationUpdates,
+    jobAlerts: settings.notifications.jobAlerts,
+    newsletter: settings.notifications.newsletter
+  }
+  privacy.value = { ...settings.privacy }
+  preferences.value.language = LANGUAGE_LABELS[settings.preferences.language] || 'English'
+}
 
-    if (password.value.next !== password.value.confirm) {
-      savedMessage.value = 'Passwords do not match.'
-      return
-    }
-
-    savedMessage.value = 'Password form validated. Connect your API to update it.'
-  } else {
-    savedMessage.value = 'Changes are ready. Connect your API to save them permanently.'
+async function loadSettings() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    applySettings(await accountApi.getSettings())
+  } catch (e) {
+    loadError.value = e.message
+  } finally {
+    loading.value = false
   }
 }
 
-function uploadPhoto(event) {
-  const file = event.target.files?.[0]
-  if (!file) return
+onMounted(loadSettings)
 
-  if (!['image/jpeg', 'image/png'].includes(file.type)) {
-    savedMessage.value = 'Please select a JPG or PNG image.'
+function showMessage(text, tone = 'success') {
+  savedMessage.value = text
+  messageTone.value = tone
+}
+
+async function saveChanges() {
+  if (saving.value) return
+  saving.value = true
+  try {
+    switch (activeSection.value) {
+      case 'password':
+        await savePassword()
+        break
+      case 'notifications':
+        applySettings(await accountApi.updateNotifications({
+          email: notifications.value.email,
+          applicationUpdates: notifications.value.applications,
+          jobAlerts: notifications.value.jobAlerts,
+          newsletter: notifications.value.newsletter
+        }))
+        showMessage('Notification preferences saved.')
+        break
+      case 'privacy':
+        applySettings(await accountApi.updatePrivacy({ ...privacy.value }))
+        showMessage('Privacy settings saved.')
+        break
+      case 'language':
+        applySettings(await accountApi.updateLanguage(preferences.value.language === 'Kiswahili' ? 'SW' : 'EN'))
+        await session.refresh() // keep the signed-in user's preferredLanguage in step
+        showMessage('Language saved.')
+        break
+      case 'appearance':
+        // Appearance is a per-device choice, kept in this browser.
+        setThemePreference(preferences.value.appearance.toLowerCase())
+        showMessage('Appearance saved on this device.')
+        break
+    }
+  } catch (e) {
+    showMessage(e.message, 'error')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function savePassword() {
+  if (password.value.next !== password.value.confirm) {
+    showMessage('Passwords do not match.', 'error')
     return
   }
-
-  if (file.size > 2 * 1024 * 1024) {
-    savedMessage.value = 'Image must be smaller than 2MB.'
-    return
-  }
-
-  if (photoPreview.value) URL.revokeObjectURL(photoPreview.value)
-  photoPreview.value = URL.createObjectURL(file)
-  savedMessage.value = 'Photo preview updated.'
-}
-
-function openQuickLink(link) {
-  // Badilisha route hizi kulingana na router yako.
-  if (link.route) {
-    window.location.href = link.route
+  try {
+    await accountApi.changePassword(password.value.current, password.value.next, password.value.confirm)
+    password.value = { current: '', next: '', confirm: '' }
+    showMessage('Password changed. Any other devices signed in to your account have been signed out.')
+  } catch (e) {
+    // Field errors (wrong current password, weak new password) are more specific than the summary.
+    showMessage(e.fieldErrors?.[0]?.message || e.message, 'error')
   }
 }
+
 </script>
 
 <template>
@@ -188,7 +249,7 @@ function openQuickLink(link) {
                 </h2>
                 <p class="mt-1 text-xs leading-5 text-slate-500">
                   <template v-if="activeSection === 'account'">
-                    Update your personal details and contact information.
+                    Your personal details and contact information. Edit them from My Profile.
                   </template>
                   <template v-else-if="activeSection === 'password'">
                     Keep your account secure with a strong password.
@@ -217,6 +278,7 @@ function openQuickLink(link) {
               type="button"
               class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-orange-600 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-orange-700"
               @click="saveChanges"
+                :disabled="saving"
             >
               <Save :size="15" />
               Save Changes
@@ -226,7 +288,10 @@ function openQuickLink(link) {
           <!-- Feedback message -->
           <div
             v-if="savedMessage"
-            class="mb-5 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-xs leading-5 text-orange-800"
+            class="mb-5 rounded-lg border px-4 py-3 text-xs leading-5"
+            :class="messageTone === 'error'
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-800'"
             role="status"
           >
             {{ savedMessage }}
@@ -235,8 +300,15 @@ function openQuickLink(link) {
             </button>
           </div>
 
+          <!-- Loading / load failure (GET /api/me/settings) -->
+          <p v-if="loading" class="py-10 text-center text-sm text-slate-500">Loading your settings…</p>
+          <div v-else-if="loadError" class="rounded-lg border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+            We couldn't load your settings. {{ loadError }}
+            <button type="button" class="ml-2 font-bold underline" @click="loadSettings">Try again</button>
+          </div>
+
           <!-- ACCOUNT INFORMATION -->
-          <div v-if="activeSection === 'account'" class="space-y-6">
+          <div v-else-if="activeSection === 'account'" class="space-y-6">
 
             <!-- Profile photo -->
             <div class="flex flex-wrap items-center gap-4">
@@ -405,7 +477,7 @@ function openQuickLink(link) {
             <div class="border-t border-slate-100 pt-5">
               <button
                 type="submit"
-                :disabled="!password.current || password.next.length < 8 || password.next !== password.confirm"
+                :disabled="saving || !password.current || password.next.length < 8 || password.next !== password.confirm"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Update Password
@@ -442,6 +514,7 @@ function openQuickLink(link) {
                 type="button"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white hover:bg-orange-700"
                 @click="saveChanges"
+                :disabled="saving"
               >
                 Save Preferences
               </button>
@@ -477,6 +550,7 @@ function openQuickLink(link) {
                 type="button"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white hover:bg-orange-700"
                 @click="saveChanges"
+                :disabled="saving"
               >
                 Save Privacy Settings
               </button>
@@ -500,12 +574,11 @@ function openQuickLink(link) {
               Country / Region
               <select
                 v-model="preferences.region"
-                class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-normal outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-50"
+                disabled
+                title="Halokazi is available in Tanzania"
+                class="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm font-normal outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-50 disabled:cursor-not-allowed disabled:bg-slate-50"
               >
                 <option>Tanzania</option>
-                <option>Kenya</option>
-                <option>Uganda</option>
-                <option>Other</option>
               </select>
             </label>
 
@@ -514,6 +587,7 @@ function openQuickLink(link) {
                 type="button"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white hover:bg-orange-700"
                 @click="saveChanges"
+                :disabled="saving"
               >
                 Save Preferences
               </button>
@@ -571,6 +645,7 @@ function openQuickLink(link) {
                 type="button"
                 class="rounded-lg bg-orange-600 px-5 py-3 text-xs font-semibold text-white hover:bg-orange-700"
                 @click="saveChanges"
+                :disabled="saving"
               >
                 Save Appearance
               </button>
@@ -602,9 +677,6 @@ function openQuickLink(link) {
               <ChevronRight :size="17" />
             </a>
 
-            <p class="text-xs leading-5 text-slate-400">
-              Replace the support email with the official contact address for your platform.
-            </p>
           </div>
         </main>
       </div>

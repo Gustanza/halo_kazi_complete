@@ -1,12 +1,22 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { Moon, Sun, Menu, X } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import { Moon, Sun, Menu, X, LogOut } from 'lucide-vue-next'
 import { useTheme } from '../../../../composables/useTheme'
 import { useScrollSpy } from '../../../../composables/useScrollSpy'
 import BrandLogo from '../../../../components/common/BrandLogo.vue'
+import { useSession } from '../../../../auth/session'
 
 const { theme, toggleTheme } = useTheme()
+const session = useSession()
+const accountHome = computed(() => session.homeFor(session.user.value))
+const router = useRouter()
+
+async function logOut() {
+  mobileOpen.value = false
+  await session.logout()
+  router.replace('/')
+}
 const mobileOpen = ref(false)
 const route = useRoute()
 
@@ -86,12 +96,29 @@ function isActive(id) {
             <Moon v-else key="moon" :size="18" />
           </Transition>
         </button>
-        <RouterLink to="/login" class="press hidden rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors hover:border-primary hover:text-primary sm:inline-flex" style="border-color: var(--color-border); color: var(--color-text)">
-          Login
-        </RouterLink>
-        <RouterLink to="/register" class="press hidden rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-600 sm:inline-flex">
-          Register
-        </RouterLink>
+        <template v-if="session.isAuthenticated.value">
+          <RouterLink :to="accountHome" class="press hidden rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-600 sm:inline-flex">
+            My dashboard
+          </RouterLink>
+          <button
+            type="button"
+            class="press hidden h-10 w-10 items-center justify-center rounded-full border transition-colors hover:border-primary hover:text-primary sm:inline-flex"
+            style="border-color: var(--color-border); color: var(--color-text)"
+            aria-label="Log out"
+            title="Log out"
+            @click="logOut"
+          >
+            <LogOut :size="17" />
+          </button>
+        </template>
+        <template v-else>
+          <RouterLink to="/login" class="press hidden rounded-full border px-5 py-2.5 text-sm font-semibold transition-colors hover:border-primary hover:text-primary sm:inline-flex" style="border-color: var(--color-border); color: var(--color-text)">
+            Login
+          </RouterLink>
+          <RouterLink to="/register" class="press hidden rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-600 sm:inline-flex">
+            Register
+          </RouterLink>
+        </template>
         <button
           type="button"
           class="press flex h-10 w-10 items-center justify-center rounded-full border lg:hidden"
@@ -132,12 +159,22 @@ function isActive(id) {
                 <Moon v-else key="moon" :size="18" />
               </Transition>
             </button>
-            <RouterLink to="/login" class="press flex-1 rounded-full border px-5 py-2.5 text-center text-sm font-semibold" style="border-color: var(--color-border); color: var(--color-text)" @click="mobileOpen = false">
-              Login
-            </RouterLink>
-            <RouterLink to="/register" class="press flex-1 rounded-full bg-primary px-5 py-2.5 text-center text-sm font-semibold text-white" @click="mobileOpen = false">
-              Register
-            </RouterLink>
+            <template v-if="session.isAuthenticated.value">
+              <RouterLink :to="accountHome" class="press flex-1 rounded-full bg-primary px-5 py-2.5 text-center text-sm font-semibold text-white" @click="mobileOpen = false">
+                My dashboard
+              </RouterLink>
+              <button type="button" class="press flex-1 rounded-full border px-5 py-2.5 text-center text-sm font-semibold" style="border-color: var(--color-border); color: var(--color-text)" @click="logOut">
+                Log out
+              </button>
+            </template>
+            <template v-else>
+              <RouterLink to="/login" class="press flex-1 rounded-full border px-5 py-2.5 text-center text-sm font-semibold" style="border-color: var(--color-border); color: var(--color-text)" @click="mobileOpen = false">
+                Login
+              </RouterLink>
+              <RouterLink to="/register" class="press flex-1 rounded-full bg-primary px-5 py-2.5 text-center text-sm font-semibold text-white" @click="mobileOpen = false">
+                Register
+              </RouterLink>
+            </template>
           </div>
         </nav>
       </div>
