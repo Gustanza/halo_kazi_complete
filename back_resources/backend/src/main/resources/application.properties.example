@@ -1,0 +1,12 @@
+spring.application.name=halokazi-backend
+server.port=8080
+
+# Database Configuration (Placeholder template - do not enter real credentials here)
+spring.datasource.url=${DB_URL:jdbc:oracle:thin:@//your-db-host:1521/FREEPDB1}
+spring.datasource.username=${DB_USERNAME:your_username}
+spring.datasource.password=${DB_PASSWORD:your_password}
+spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=true
+spring.datasource.hikari.maximum-pool-size=5
+spring.datasource.hikari.connection-timeout=30000
