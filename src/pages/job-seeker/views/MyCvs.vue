@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
 import {
@@ -8,10 +8,14 @@ import {
 
 const router = useRouter()
 
-const activeTab = ref('All CVs')
+const defaultTab = ref('All CVs')
 const sortBy = ref('Most Recent')
 const openMenu = ref(null)
 
+// Soma CV iliyochaguliwa kutoka localStorage
+const savedDefaultId = localStorage.getItem('defaultCvId')
+
+// CV data
 const cvs = ref([
   {
     id: 1,
@@ -19,8 +23,6 @@ const cvs = ref([
     description: 'Modern and clean CV with professional layout. Suitable for corporate and tech roles.',
     created: '12 Apr 2025',
     updated: '2 days ago',
-    status: 'Active',
-    default: true,
     theme: 'professional',
     templateId: 1,
   },
@@ -30,8 +32,6 @@ const cvs = ref([
     description: 'Modern layout with a bold orange accent.',
     created: '5 Mar 2025',
     updated: '1 week ago',
-    status: 'Active',
-    default: false,
     theme: 'modern',
     templateId: 2,
   },
@@ -41,8 +41,6 @@ const cvs = ref([
     description: 'Simple, clean, and professional single-column layout.',
     created: '20 Feb 2025',
     updated: '3 weeks ago',
-    status: 'Active',
-    default: false,
     theme: 'minimal',
     templateId: 3,
   },
@@ -52,8 +50,6 @@ const cvs = ref([
     description: 'Creative layout with a distinctive purple accent.',
     created: '10 Jan 2025',
     updated: '2 months ago',
-    status: 'Active',
-    default: false,
     theme: 'creative',
     templateId: 4,
   },
@@ -63,20 +59,46 @@ const cvs = ref([
     description: 'A straightforward single-column CV with a dark top border.',
     created: '8 Jan 2025',
     updated: '2 months ago',
-    status: 'Active',
-    default: false,
     theme: 'simple',
     templateId: 5,
   },
 ])
 
-const filteredCvs = computed(() => {
-  let result = [...cvs.value]
+// Kama hakuna CV iliyohifadhiwa, Professional CV ndiyo Default ya mwanzo.
+// Kama ipo localStorage, tumia selection ya mwisho.
+const initialDefaultId = cvs.value.some(
+  cv => String(cv.id) === savedDefaultId
+)
+  ? Number(savedDefaultId)
+  : 1
 
-  if (activeTab.value === 'Active') {
-    result = result.filter(cv => cv.status === 'Active')
-  } else if (activeTab.value === 'Inactive') {
-    result = result.filter(cv => cv.status === 'Inactive')
+const defaultCvId = ref(initialDefaultId)
+
+// Tengeneza status kulingana na CV iliyochaguliwa
+const cvList = computed(() =>
+  cvs.value.map(cv => ({
+    ...cv,
+    default: cv.id === defaultCvId.value,
+    status: cv.id === defaultCvId.value ? 'Default' : 'Non Default',
+  }))
+)
+
+// Hifadhi selection kila unapobadilisha Default
+watch(
+  defaultCvId,
+  (id) => {
+    localStorage.setItem('defaultCvId', String(id))
+  },
+  { immediate: true }
+)
+
+const filteredCvs = computed(() => {
+  let result = [...cvList.value]
+
+  if (defaultTab.value === 'Default') {
+    result = result.filter(cv => cv.default)
+  } else if (defaultTab.value === 'Non Default') {
+    result = result.filter(cv => !cv.default)
   }
 
   if (sortBy.value === 'Name A-Z') {
@@ -99,15 +121,9 @@ function useCv(cv) {
   })
 }
 
-function toggleStatus(cv) {
-  cv.status = cv.status === 'Active' ? 'Inactive' : 'Active'
-  openMenu.value = null
-}
-
 function setDefault(cv) {
-  cvs.value.forEach(item => {
-    item.default = item.id === cv.id
-  })
+  // Hifadhi CV mpya iliyochaguliwa
+  defaultCvId.value = cv.id
   openMenu.value = null
 }
 
@@ -125,6 +141,7 @@ function viewCv(cv) {
 <template>
   <DashboardLayout>
     <div class="space-y-3 text-slate-800">
+
       <!-- Page heading -->
       <section class="rounded-xl border border-orange-200 bg-white px-5 py-4 shadow-sm">
         <h1 class="text-3xl font-extrabold">My CVs</h1>
@@ -140,16 +157,22 @@ function viewCv(cv) {
       >
         <div class="flex flex-wrap gap-2 sm:gap-5">
           <button
-            v-for="tab in ['All CVs', 'Active', 'Inactive']"
+            v-for="tab in ['All CVs', 'Default', 'Non Default']"
             :key="tab"
-            @click="activeTab = tab"
+            @click="defaultTab = tab"
             class="border-b-2 px-3 py-2 text-xs font-medium transition"
-            :class="activeTab === tab
+            :class="defaultTab === tab
               ? 'border-orange-500 text-orange-600'
               : 'border-transparent text-slate-500 hover:text-orange-500'"
           >
-            {{ tab }}<span v-if="tab === 'All CVs'">({{ cvs.length }})</span>
-            <span v-else>({{ cvs.filter(cv => cv.status === tab).length }})</span>
+            {{ tab }}
+            <span>
+              ({{ tab === 'All CVs'
+                ? cvs.length
+                : tab === 'Default'
+                  ? cvList.filter(cv => cv.default).length
+                  : cvList.filter(cv => !cv.default).length }})
+            </span>
           </button>
         </div>
 
@@ -170,17 +193,20 @@ function viewCv(cv) {
       <section
         v-for="cv in filteredCvs"
         :key="cv.id"
-        class="relative rounded-xl border border-orange-200 bg-white p-3 sm:px-5 sm:py-3"
+        class="relative rounded-xl border bg-white p-3 sm:px-5 sm:py-3"
+        :class="cv.default
+          ? 'border-orange-500 ring-1 ring-orange-200'
+          : 'border-orange-200'"
       >
         <div class="flex flex-col gap-3 sm:flex-row sm:gap-5">
+
           <!-- CV preview thumbnail -->
           <div
             class="flex h-32 w-28 shrink-0 self-start overflow-hidden rounded-md border border-slate-100 bg-slate-50 p-1"
           >
-            <div
-              class="relative flex h-full w-full overflow-hidden rounded-sm bg-white"
-            >
-              <!-- Professional: blue sidebar -->
+            <div class="relative flex h-full w-full overflow-hidden rounded-sm bg-white">
+
+              <!-- Professional -->
               <template v-if="cv.theme === 'professional'">
                 <div class="w-[34%] bg-blue-100 p-1">
                   <div class="mx-auto mb-2 h-5 w-5 rounded-full bg-blue-300"></div>
@@ -194,7 +220,7 @@ function viewCv(cv) {
                 </div>
               </template>
 
-              <!-- Modern: orange sidebar -->
+              <!-- Modern -->
               <template v-else-if="cv.theme === 'modern'">
                 <div class="w-[34%] bg-orange-500 p-1">
                   <div class="mx-auto mb-2 h-5 w-5 rounded-full bg-orange-200"></div>
@@ -208,7 +234,7 @@ function viewCv(cv) {
                 </div>
               </template>
 
-              <!-- Minimal: single column -->
+              <!-- Minimal -->
               <template v-else-if="cv.theme === 'minimal'">
                 <div class="w-full p-2">
                   <div class="mb-1 h-2 w-4/5 rounded-sm bg-slate-800"></div>
@@ -220,7 +246,7 @@ function viewCv(cv) {
                 </div>
               </template>
 
-              <!-- Creative: purple sidebar -->
+              <!-- Creative -->
               <template v-else-if="cv.theme === 'creative'">
                 <div class="w-[34%] bg-violet-800 p-1">
                   <div class="mx-auto mb-2 h-5 w-5 rounded-full bg-violet-300"></div>
@@ -234,7 +260,7 @@ function viewCv(cv) {
                 </div>
               </template>
 
-              <!-- Simple: dark top border, single column -->
+              <!-- Simple -->
               <template v-else>
                 <div class="w-full border-t-4 border-slate-800 p-2">
                   <div class="mb-1 h-2 w-4/5 rounded-sm bg-slate-700"></div>
@@ -245,17 +271,21 @@ function viewCv(cv) {
                   <div v-for="n in 4" :key="n" class="mb-1 h-1 rounded bg-slate-200"></div>
                 </div>
               </template>
+
             </div>
           </div>
 
           <!-- CV details -->
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2 pr-6">
-              <h2 class="text-base font-bold text-slate-900">{{ cv.title }}</h2>
+              <h2 class="text-base font-bold text-slate-900">
+                {{ cv.title }}
+              </h2>
             </div>
 
             <p class="mt-2 text-xs text-slate-400">
-              Created on {{ cv.created }} <span class="mx-1">·</span>
+              Created on {{ cv.created }}
+              <span class="mx-1">·</span>
               Updated {{ cv.updated }}
             </p>
 
@@ -295,8 +325,8 @@ function viewCv(cv) {
           <div class="absolute right-3 top-3 flex items-center gap-2 sm:right-4">
             <span
               class="rounded-full px-2.5 py-1 text-[10px] font-semibold"
-              :class="cv.status === 'Active'
-                ? 'bg-green-100 text-green-700'
+              :class="cv.default
+                ? 'bg-orange-100 text-orange-700'
                 : 'bg-slate-100 text-slate-600'"
             >
               {{ cv.status }}
@@ -315,13 +345,15 @@ function viewCv(cv) {
               class="absolute right-0 top-8 z-20 w-40 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
             >
               <button
-                @click="toggleStatus(cv)"
-                class="block w-full rounded px-3 py-2 text-left text-xs hover:bg-orange-50"
+                @click="setDefault(cv)"
+                :disabled="cv.default"
+                class="block w-full rounded px-3 py-2 text-left text-xs hover:bg-orange-50 disabled:cursor-default disabled:text-orange-600"
               >
-                {{ cv.status === 'Active' ? 'Mark inactive' : 'Mark active' }}
+                {{ cv.default ? 'Current Default' : 'Set as Default' }}
               </button>
             </div>
           </div>
+
         </div>
       </section>
 
@@ -336,6 +368,7 @@ function viewCv(cv) {
           There are no CVs in this category.
         </p>
       </section>
+
     </div>
   </DashboardLayout>
 </template>

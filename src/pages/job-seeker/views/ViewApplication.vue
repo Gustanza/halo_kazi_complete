@@ -311,6 +311,15 @@ function goBack() {
       <section
         class="rounded-xl border border-orange-200 bg-white px-5 py-4 shadow-sm"
       >
+      <!-- Back to My Applications -->
+        <button
+           type="button"
+            class="mb-3 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-orange-600"
+            @click="goBack"
+        >
+            <ArrowLeft :size="17" />
+                Back to Applications
+         </button>
         <div
           class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
         >
@@ -320,7 +329,7 @@ function goBack() {
               View Application
             </h1>
 
-            <p class="mt-1 text-sm text-slate-500">
+            <p class="mt-1 text-sm">
               View details of your selected job application.
             </p>
           </div>

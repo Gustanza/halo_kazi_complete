@@ -211,6 +211,14 @@ const downloadPdf = () => window.print()
     <div class="space-y-5 cv-builder-page">
       <!-- Header -->
       <section class="rounded-2xl border border-orange-200 bg-white px-5 py-4 shadow-sm no-print">
+      <button
+        type="button"
+        class="mb-3 inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition hover:text-[#FD5C20]"
+        @click="router.push('/dashboard/cv-builder')"
+      >
+        <ArrowLeft :size="17" />
+           Back to CV Builder
+      </button>
         <h1 class="text-3xl font-extrabold" style="color: var(--color-text)">
           CV Template
         </h1>
