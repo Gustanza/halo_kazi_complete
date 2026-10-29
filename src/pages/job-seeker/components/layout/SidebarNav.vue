@@ -8,6 +8,7 @@ import {
   Bookmark,
   Send,
   BellRing,
+  Bell,
   Settings,
   Sparkles,
 } from 'lucide-vue-next'
@@ -29,6 +30,7 @@ const secondaryLinks = [
   { label: 'Saved Jobs', to: '/dashboard/saved-jobs', icon: Bookmark },
   { label: 'Applications', to: '/dashboard/applications', icon: Send },
   { label: 'Job Alerts', to: '/dashboard/job-alerts', icon: BellRing },
+  { label: 'Notifications', to: '/dashboard/notifications', icon: Bell },
 ]
 </script>
 

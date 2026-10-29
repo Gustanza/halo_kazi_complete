@@ -9,15 +9,17 @@ import tz.co.halotel.halokazi.common.validation.StrongPassword;
 import tz.co.halotel.halokazi.common.validation.TanzanianPhone;
 
 /**
- * AUTH-01 / AUTH-07. {@code fullName} is the company name for employers; email is required
- * for both roles.
+ * AUTH-01 / AUTH-07. {@code fullName} is the company name for employers. Email is required for
+ * employers only - job seekers register and log in with phone number alone, and
+ * {@link tz.co.halotel.halokazi.auth.RegistrationService} assigns them a synthetic internal
+ * address so the (NOT NULL, unique) {@code app_user.email} column is still satisfied.
  */
 @PasswordsMatch
 public record RegisterRequest(
         @NotNull RegistrationRole role,
         @NotBlank @Size(max = 150) String fullName,
         @NotBlank @TanzanianPhone String phone,
-        @NotBlank @Email @Size(max = 254) String email,
+        @Email @Size(max = 254) String email,
         // BCrypt only reads the first 72 bytes; 64 chars keeps multi-byte input safe.
         @NotBlank @Size(max = 64) @StrongPassword String password,
         @NotBlank String repeatPassword) implements PasswordsMatch.PasswordConfirmation {

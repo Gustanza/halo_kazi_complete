@@ -3,8 +3,11 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Eye, EyeOff, Mail, Lock, User, Search, Building2, Check } from 'lucide-vue-next'
 import AuthSplitLayout from '../components/auth/AuthSplitLayout.vue'
+import { useAuthStore } from '../../../stores/auth'
+import { ApiRequestError } from '../../../api/http'
 
 const router = useRouter()
+const auth = useAuthStore()
 
 const fullName = ref('')
 const phone = ref('')
@@ -13,6 +16,9 @@ const password = ref('')
 const repeatPassword = ref('')
 const showPassword = ref(false)
 const role = ref('job_seeker') // 'job_seeker' | 'employer'
+const submitting = ref(false)
+const formError = ref('')
+const fieldErrors = ref({})
 
 const roleOptions = [
   { value: 'job_seeker', icon: Search, label: 'Job Seeker', description: "I'm looking for a job" },
@@ -22,19 +28,47 @@ const roleOptions = [
 const isEmployer = computed(() => role.value === 'employer')
 const nameLabel = computed(() => (isEmployer.value ? 'Company name' : 'Full name'))
 const namePlaceholder = computed(() => (isEmployer.value ? 'Enter your company name' : 'Enter your full name'))
+const emailLabel = computed(() => (isEmployer.value ? 'Company email' : 'Email address'))
 
 function selectRole(value) {
   role.value = value
 }
 
-function handleSubmit() {
-  // No backend yet. Per the documented TO-BE flow, every new account must pass
-  // System (OTP/SMS) verification before it can log in - so hand off to that step
-  // instead of logging the user straight in.
-  router.push({
-    path: '/verify-otp',
-    query: { phone: phone.value, role: role.value, name: fullName.value },
-  })
+async function handleSubmit() {
+  formError.value = ''
+  fieldErrors.value = {}
+  submitting.value = true
+  try {
+    const result = await auth.register({
+      role: role.value,
+      fullName: fullName.value,
+      phone: phone.value,
+      email: email.value,
+      password: password.value,
+      repeatPassword: repeatPassword.value,
+    })
+    // Per the documented TO-BE flow, every new account must pass System (OTP/SMS)
+    // verification before it can log in - hand off to that step.
+    router.push({
+      path: '/verify-otp',
+      query: {
+        phone: result.phone,
+        role: role.value,
+        name: fullName.value,
+        otpExpiresInSeconds: result.otpExpiresInSeconds,
+        resendAvailableInSeconds: result.resendAvailableInSeconds,
+      },
+    })
+  } catch (error) {
+    if (error instanceof ApiRequestError) {
+      formError.value = error.fieldErrors.length ? '' : error.message
+      fieldErrors.value = Object.fromEntries(error.fieldErrors.map((e) => [e.field, e.message]))
+    } else {
+      formError.value = 'Something went wrong. Please try again.'
+    }
+  } finally {
+    submitting.value = false
+  }
 }
 </script>
 
@@ -89,7 +123,10 @@ function handleSubmit() {
       <div class="space-y-5">
         <div>
           <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">{{ nameLabel }}</label>
-          <div class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
+          <div
+            class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary"
+            :style="fieldErrors.fullName ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
+          >
             <User :size="16" style="color: var(--color-text-muted)" />
             <input
               v-model="fullName"
@@ -100,26 +137,38 @@ function handleSubmit() {
               style="color: var(--color-text)"
             />
           </div>
+          <p v-if="fieldErrors.fullName" class="mt-1 text-xs text-red-500">{{ fieldErrors.fullName }}</p>
         </div>
 
         <div>
           <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">Halotel number</label>
-          <div class="flex overflow-hidden rounded-lg border transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
+          <div
+            class="flex overflow-hidden rounded-lg border transition-colors focus-within:border-primary"
+            :style="fieldErrors.phone ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
+          >
             <span class="flex items-center gap-1 border-r px-3 text-sm font-medium" style="border-color: var(--color-border); color: var(--color-text)">+255</span>
             <input
               v-model="phone"
               type="tel"
+              inputmode="numeric"
+              autocomplete="tel-national"
               required
+              maxlength="9"
               placeholder="7XX XXX XXX"
               class="w-full bg-transparent px-3 py-2.5 text-sm focus:outline-none"
               style="color: var(--color-text)"
+              @input="phone = phone.replace(/\D/g, '').slice(0, 9)"
             />
           </div>
+          <p v-if="fieldErrors.phone" class="mt-1 text-xs text-red-500">{{ fieldErrors.phone }}</p>
         </div>
 
         <div v-if="isEmployer">
-          <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">Company email</label>
-          <div class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
+          <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">{{ emailLabel }}</label>
+          <div
+            class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary"
+            :style="fieldErrors.email ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
+          >
             <Mail :size="16" style="color: var(--color-text-muted)" />
             <input
               v-model="email"
@@ -130,11 +179,15 @@ function handleSubmit() {
               style="color: var(--color-text)"
             />
           </div>
+          <p v-if="fieldErrors.email" class="mt-1 text-xs text-red-500">{{ fieldErrors.email }}</p>
         </div>
 
         <div>
           <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">Password</label>
-          <div class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
+          <div
+            class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary"
+            :style="fieldErrors.password ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
+          >
             <Lock :size="16" style="color: var(--color-text-muted)" />
             <input
               v-model="password"
@@ -149,11 +202,15 @@ function handleSubmit() {
               <Eye v-else :size="17" />
             </button>
           </div>
+          <p v-if="fieldErrors.password" class="mt-1 text-xs text-red-500">{{ fieldErrors.password }}</p>
         </div>
 
         <div>
           <label class="mb-1.5 block text-xs font-medium" style="color: var(--color-text-muted)">Repeat password</label>
-          <div class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary" style="border-color: var(--color-border)">
+          <div
+            class="flex items-center gap-2 rounded-lg border pl-3 transition-colors focus-within:border-primary"
+            :style="fieldErrors.repeatPassword ? 'border-color:#ef4444' : 'border-color: var(--color-border)'"
+          >
             <Lock :size="16" style="color: var(--color-text-muted)" />
             <input
               v-model="repeatPassword"
@@ -164,10 +221,15 @@ function handleSubmit() {
               style="color: var(--color-text)"
             />
           </div>
+          <p v-if="fieldErrors.repeatPassword" class="mt-1 text-xs text-red-500">{{ fieldErrors.repeatPassword }}</p>
         </div>
       </div>
 
-      <button type="submit" class="btn-primary w-full">Create Account</button>
+      <p v-if="formError" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10">{{ formError }}</p>
+
+      <button type="submit" class="btn-primary w-full" :disabled="submitting">
+        {{ submitting ? 'Creating account…' : 'Create Account' }}
+      </button>
     </form>
 
     <p class="mt-6 text-center text-sm" style="color: var(--color-text-muted)">

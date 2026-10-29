@@ -1,95 +1,59 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
+import Skeleton from '../../../components/ui/Skeleton.vue'
+import ConfirmDialog from '../../../components/ui/ConfirmDialog.vue'
+import EmptyState from '../../../components/ui/EmptyState.vue'
 import {
-  FileText, MoreVertical, Eye, Download,
+  FileText, MoreVertical, Eye, Download, Trash2,
 } from 'lucide-vue-next'
+import * as cvApi from '../../../api/cv'
+import { useToast } from '../../../composables/useToast'
 
 const router = useRouter()
+const toast = useToast()
 
 const defaultTab = ref('All CVs')
 const sortBy = ref('Most Recent')
 const openMenu = ref(null)
+const loading = ref(true)
+const cvs = ref([])
+const deleteTarget = ref(null)
+const deleting = ref(false)
 
-// Soma CV iliyochaguliwa kutoka localStorage
-const savedDefaultId = localStorage.getItem('defaultCvId')
+// Visual theme/preview per template id - matches the 5 layouts CvBuilder.vue offers.
+const THEME_BY_TEMPLATE = { 1: 'professional', 2: 'modern', 3: 'minimal', 4: 'creative', 5: 'simple' }
 
-// CV data
-const cvs = ref([
-  {
-    id: 1,
-    title: 'Professional CV',
-    description: 'Modern and clean CV with professional layout. Suitable for corporate and tech roles.',
-    created: '12 Apr 2025',
-    updated: '2 days ago',
-    theme: 'professional',
-    templateId: 1,
-  },
-  {
-    id: 2,
-    title: 'Modern CV',
-    description: 'Modern layout with a bold orange accent.',
-    created: '5 Mar 2025',
-    updated: '1 week ago',
-    theme: 'modern',
-    templateId: 2,
-  },
-  {
-    id: 3,
-    title: 'Minimal CV',
-    description: 'Simple, clean, and professional single-column layout.',
-    created: '20 Feb 2025',
-    updated: '3 weeks ago',
-    theme: 'minimal',
-    templateId: 3,
-  },
-  {
-    id: 4,
-    title: 'Creative CV',
-    description: 'Creative layout with a distinctive purple accent.',
-    created: '10 Jan 2025',
-    updated: '2 months ago',
-    theme: 'creative',
-    templateId: 4,
-  },
-  {
-    id: 5,
-    title: 'Simple CV',
-    description: 'A straightforward single-column CV with a dark top border.',
-    created: '8 Jan 2025',
-    updated: '2 months ago',
-    theme: 'simple',
-    templateId: 5,
-  },
-])
+async function load() {
+  loading.value = true
+  try {
+    cvs.value = await cvApi.listCvs()
+  } catch {
+    toast.error('Could not load your CVs.')
+  } finally {
+    loading.value = false
+  }
+}
 
-// Kama hakuna CV iliyohifadhiwa, Professional CV ndiyo Default ya mwanzo.
-// Kama ipo localStorage, tumia selection ya mwisho.
-const initialDefaultId = cvs.value.some(
-  cv => String(cv.id) === savedDefaultId
-)
-  ? Number(savedDefaultId)
-  : 1
+onMounted(load)
 
-const defaultCvId = ref(initialDefaultId)
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
-// Tengeneza status kulingana na CV iliyochaguliwa
+// `isLastUsed` from the backend/stub drives the "Default" badge - the CV a new one starts from.
 const cvList = computed(() =>
   cvs.value.map(cv => ({
     ...cv,
-    default: cv.id === defaultCvId.value,
-    status: cv.id === defaultCvId.value ? 'Default' : 'Non Default',
+    title: cv.cvName,
+    description: cv.summary || cv.professionalTitle,
+    created: formatDate(cv.createdAt),
+    updated: formatDate(cv.updatedAt),
+    theme: THEME_BY_TEMPLATE[cv.templateId] || 'simple',
+    default: cv.isLastUsed,
+    status: cv.isLastUsed ? 'Default' : 'Non Default',
   }))
-)
-
-// Hifadhi selection kila unapobadilisha Default
-watch(
-  defaultCvId,
-  (id) => {
-    localStorage.setItem('defaultCvId', String(id))
-  },
-  { immediate: true }
 )
 
 const filteredCvs = computed(() => {
@@ -121,10 +85,10 @@ function useCv(cv) {
   })
 }
 
-function setDefault(cv) {
-  // Hifadhi CV mpya iliyochaguliwa
-  defaultCvId.value = cv.id
+async function setDefault(cv) {
   openMenu.value = null
+  await cvApi.setLastUsedCv(cv.id)
+  await load()
 }
 
 function viewCv(cv) {
@@ -135,6 +99,26 @@ function viewCv(cv) {
       template: cv.templateId,
     },
   })
+}
+
+function confirmDelete(cv) {
+  openMenu.value = null
+  deleteTarget.value = cv
+}
+
+async function deleteCv() {
+  if (!deleteTarget.value) return
+  deleting.value = true
+  try {
+    await cvApi.deleteCv(deleteTarget.value.id)
+    toast.success('CV deleted.')
+    deleteTarget.value = null
+    await load()
+  } catch {
+    toast.error('Could not delete this CV.')
+  } finally {
+    deleting.value = false
+  }
 }
 </script>
 
@@ -189,9 +173,15 @@ function viewCv(cv) {
         </label>
       </section>
 
+      <!-- Loading -->
+      <template v-if="loading">
+        <Skeleton v-for="i in 3" :key="i" variant="card" height="9rem" />
+      </template>
+
       <!-- CV cards -->
       <section
         v-for="cv in filteredCvs"
+        v-else
         :key="cv.id"
         class="relative rounded-xl border bg-white p-3 sm:px-5 sm:py-3"
         :class="cv.default
@@ -351,6 +341,12 @@ function viewCv(cv) {
               >
                 {{ cv.default ? 'Current Default' : 'Set as Default' }}
               </button>
+              <button
+                @click="confirmDelete(cv)"
+                class="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-red-500 hover:bg-red-50"
+              >
+                <Trash2 :size="14" /> Delete
+              </button>
             </div>
           </div>
 
@@ -358,16 +354,24 @@ function viewCv(cv) {
       </section>
 
       <!-- Empty state -->
-      <section
-        v-if="filteredCvs.length === 0"
-        class="rounded-xl border border-orange-200 bg-white p-10 text-center"
-      >
-        <FileText class="mx-auto mb-3 text-slate-400" :size="35" />
-        <h2 class="font-semibold">No CVs found</h2>
-        <p class="mt-1 text-sm text-slate-500">
-          There are no CVs in this category.
-        </p>
-      </section>
+      <EmptyState
+        v-if="!loading && filteredCvs.length === 0"
+        :icon="FileText"
+        title="No CVs found"
+        description="There are no CVs in this category yet."
+        action-label="Create your first CV"
+        @action="buildNewCv"
+      />
+
+      <ConfirmDialog
+        :open="!!deleteTarget"
+        title="Delete this CV?"
+        :description="`'${deleteTarget?.title}' will be permanently deleted.`"
+        confirm-label="Delete"
+        :loading="deleting"
+        @confirm="deleteCv"
+        @close="deleteTarget = null"
+      />
 
     </div>
   </DashboardLayout>

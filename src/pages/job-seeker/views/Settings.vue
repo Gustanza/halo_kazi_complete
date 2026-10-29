@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import {
   UserRound, LockKeyhole, Bell, ShieldCheck, Globe, Palette,
   CircleHelp, Camera, Save, MapPin, Settings as SettingsIcon,
@@ -8,7 +8,16 @@ import {
 } from 'lucide-vue-next'
 
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
+import Skeleton from '../../../components/ui/Skeleton.vue'
+import { useAuthStore } from '../../../stores/auth'
+import * as profileApi from '../../../api/profile'
+import { useToast } from '../../../composables/useToast'
 
+const auth = useAuthStore()
+const toast = useToast()
+
+const loading = ref(true)
+const saving = ref(false)
 const activeSection = ref('account')
 const savedMessage = ref('')
 const showCurrentPassword = ref(false)
@@ -16,15 +25,21 @@ const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
 const photoPreview = ref('')
 
-const account = ref({
-  fullName: 'Raymond Mwangi',
-  email: 'mwangiraymond@gmail.com',
-  phone: '+255 624023920',
-  dateOfBirth: '2001-01-12',
-  gender: 'Male',
-  location: 'Dar es Salaam, Tanzania',
-  about: 'Results-driven marketing professional with 5+ years of experience in digital marketing, brand strategy and social media management.'
-})
+// Account identity (fullName/email/phone) comes from the auth store's user - these are
+// AppUser columns, changed via registration/verification, not a Settings form. The rest
+// (dateOfBirth/gender/location/about) lives in the same profile stub ProfileView.vue edits,
+// so the two pages stay consistent instead of each keeping their own fake person.
+const account = computed(() => ({
+  fullName: auth.user.value?.fullName || '',
+  email: auth.user.value?.email || '',
+  phone: auth.user.value?.phone || '',
+  dateOfBirth: profile.value.personalInfo.dateOfBirth,
+  gender: profile.value.personalInfo.gender,
+  location: profile.value.personalInfo.location,
+  about: profile.value.personalInfo.summary,
+}))
+
+const profile = ref({ personalInfo: { dateOfBirth: '', gender: '', location: '', summary: '' } })
 
 const password = ref({
   current: '',
@@ -50,6 +65,23 @@ const preferences = ref({
   region: 'Tanzania',
   appearance: 'Light'
 })
+
+async function loadSettings() {
+  loading.value = true
+  try {
+    const [profileData, settings] = await Promise.all([profileApi.getProfile(), profileApi.getSettings()])
+    profile.value = profileData
+    notifications.value = settings.notifications
+    privacy.value = settings.privacy
+    preferences.value = settings.preferences
+  } catch {
+    toast.error('Could not load your settings.')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadSettings)
 
 const sections = [
   { id: 'account', label: 'Account Information', icon: UserRound },
@@ -80,21 +112,36 @@ const sectionTitle = computed(() =>
 
 const aboutCount = computed(() => account.value.about.length)
 
-function saveChanges() {
-  if (activeSection.value === 'password') {
-    if (password.value.next.length < 8) {
-      savedMessage.value = 'Password must contain at least 8 characters.'
-      return
+async function saveChanges() {
+  saving.value = true
+  savedMessage.value = ''
+  try {
+    if (activeSection.value === 'password') {
+      if (password.value.next.length < 8) {
+        savedMessage.value = 'Password must contain at least 8 characters.'
+        return
+      }
+      if (password.value.next !== password.value.confirm) {
+        savedMessage.value = 'Passwords do not match.'
+        return
+      }
+      await profileApi.changePassword({ currentPassword: password.value.current, newPassword: password.value.next })
+      password.value = { current: '', next: '', confirm: '' }
+      toast.success('Password updated.')
+    } else if (activeSection.value === 'notifications') {
+      await profileApi.updateSettings({ notifications: notifications.value })
+      toast.success('Notification preferences saved.')
+    } else if (activeSection.value === 'privacy') {
+      await profileApi.updateSettings({ privacy: privacy.value })
+      toast.success('Privacy settings saved.')
+    } else {
+      await profileApi.updateSettings({ preferences: preferences.value })
+      toast.success('Preferences saved.')
     }
-
-    if (password.value.next !== password.value.confirm) {
-      savedMessage.value = 'Passwords do not match.'
-      return
-    }
-
-    savedMessage.value = 'Password form validated. Connect your API to update it.'
-  } else {
-    savedMessage.value = 'Changes are ready. Connect your API to save them permanently.'
+  } catch (error) {
+    savedMessage.value = error?.message || 'Unable to save. Please try again.'
+  } finally {
+    saving.value = false
   }
 }
 
@@ -127,7 +174,12 @@ function openQuickLink(link) {
 
 <template>
   <DashboardLayout>
-    <div class="min-w-0 space-y-6 pb-8">
+    <div v-if="loading" class="min-w-0 space-y-6 pb-8">
+      <Skeleton variant="card" height="3.5rem" />
+      <Skeleton variant="card" height="24rem" />
+    </div>
+
+    <div v-else class="min-w-0 space-y-6 pb-8">
 
       <!-- Page heading -->
       <header class="flex items-center gap-4">

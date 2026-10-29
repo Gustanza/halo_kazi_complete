@@ -74,9 +74,9 @@ public class RegistrationService {
      */
     public RegisterResponse register(RegisterRequest request, ClientInfo client) {
         String phone = PhoneNumbers.require(request.phone());
-        String email = Emails.normalize(request.email());
         String fullName = request.fullName().trim();
         Role role = request.role().toRole();
+        String email = resolveEmail(role, request.email(), phone);
 
         users.findByPhone(phone).ifPresent(existing -> {
             throw existing.isPendingVerification()
@@ -103,6 +103,24 @@ public class RegistrationService {
         OtpDispatch dispatch = otps.issue(user, OtpPurpose.PHONE_VERIFICATION, client);
         return new RegisterResponse(user.getId(), phone, role, dispatch.expiresInSeconds(),
                 dispatch.resendAvailableInSeconds());
+    }
+
+    /**
+     * Employers must supply a real email. Job seekers register and log in with phone number
+     * alone (AUTH-07 UI), so they get a synthetic, internal-only address derived from their
+     * phone number - unique and NOT NULL like every other {@code app_user.email} row, but never
+     * shown to them and never usable as a login identifier in practice.
+     */
+    private String resolveEmail(Role role, String rawEmail, String normalizedPhone) {
+        if (role != Role.EMPLOYER) {
+            return "jobseeker+" + normalizedPhone.substring(1) + "@users.halokazi.local";
+        }
+        String email = Emails.normalize(rawEmail);
+        if (email == null || email.isBlank()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED)
+                    .field("email", "Email is required for employer accounts.");
+        }
+        return email;
     }
 
     /**

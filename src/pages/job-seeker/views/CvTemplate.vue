@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   UserRound,
@@ -17,20 +17,27 @@ import {
   X,
 } from 'lucide-vue-next'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
+import AppButton from '../../../components/ui/AppButton.vue'
+import Skeleton from '../../../components/ui/Skeleton.vue'
+import * as cvApi from '../../../api/cv'
+import { ApiRequestError } from '../../../api/http'
+import { useToast } from '../../../composables/useToast'
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 const currentStep = ref(1)
+
+const existingCvId = route.query.cv ? Number(route.query.cv) : null
+const cvId = ref(existingCvId)
+const cvName = ref('')
+const saving = ref(false)
+const loadingExisting = ref(!!existingCvId)
+const formError = ref('')
 
 const selectedTemplate = computed(() => {
   const queryId = Number(route.query.template)
-  const savedId = Number(localStorage.getItem('cvSelectedTemplate'))
-
-  return [1, 2, 3, 4, 5].includes(queryId)
-    ? queryId
-    : [1, 2, 3, 4, 5].includes(savedId)
-      ? savedId
-      : 1
+  return [1, 2, 3, 4, 5].includes(queryId) ? queryId : 1
 })
 
 const templateName = computed(() => ({
@@ -42,24 +49,16 @@ const templateName = computed(() => ({
 }[selectedTemplate.value]))
 
 const form = ref({
-  fullName: 'Raymond Mwangi',
-  email: 'john.mwangi@email.com',
-  phone: '+255 624023920',
-  location: 'Dar es Salaam, Tanzania',
-  professionalTitle: 'Marketing Specialist',
-  summary: 'Results-driven marketing professional with 5+ years of experience in digital marketing, brand strategy and social media management.',
+  fullName: '',
+  email: '',
+  phone: '',
+  location: '',
+  professionalTitle: '',
+  summary: '',
   photo: null,
 })
 
-const education = ref([
-  {
-    id: 1,
-    degree: 'Bachelor of Business Administration',
-    institution: 'University of Dar es Salaam',
-    startYear: '2014',
-    endYear: '2017',
-  },
-])
+const education = ref([])
 
 const newEducation = ref({
   degree: '',
@@ -89,26 +88,7 @@ const removeEducation = id => {
   education.value = education.value.filter(item => item.id !== id)
 }
 
-const experiences = ref([
-  {
-    id: 1,
-    jobTitle: 'Marketing Specialist',
-    company: 'ABC Company Ltd',
-    location: 'Dar es Salaam',
-    startDate: '2021',
-    endDate: 'Present',
-    description: 'Develop and execute digital marketing campaigns. Manage social media platforms and content. Analyze campaign performance and reporting.',
-  },
-  {
-    id: 2,
-    jobTitle: 'Marketing Officer',
-    company: 'XYZ Company',
-    location: 'Dar es Salaam',
-    startDate: '2018',
-    endDate: '2021',
-    description: 'Assisted in developing marketing strategies and managed customer communications.',
-  },
-])
+const experiences = ref([])
 
 const newExperience = ref({
   jobTitle: '',
@@ -143,12 +123,7 @@ const removeExperience = id => {
   experiences.value = experiences.value.filter(item => item.id !== id)
 }
 
-const skills = ref([
-  'Digital Marketing',
-  'Social Media Management',
-  'SEO & SEM',
-  'Content Creation',
-])
+const skills = ref([])
 
 const newSkill = ref('')
 
@@ -162,6 +137,70 @@ const addSkill = () => {
 
 const removeSkill = skill => {
   skills.value = skills.value.filter(item => item !== skill)
+}
+
+function hydrateFrom(record) {
+  cvName.value = record.cvName || ''
+  form.value = {
+    fullName: record.fullName || '',
+    email: record.email || '',
+    phone: record.phone || '',
+    location: record.location || '',
+    professionalTitle: record.professionalTitle || '',
+    summary: record.summary || '',
+    photo: record.photo || null,
+  }
+  education.value = record.education || []
+  experiences.value = record.experiences || []
+  skills.value = record.skills || []
+}
+
+onMounted(async () => {
+  try {
+    if (cvId.value) {
+      const existing = await cvApi.getCv(cvId.value)
+      hydrateFrom(existing)
+    } else {
+      // Per the 23 Oct 2026 meeting decision: start a new CV from the last used one
+      // instead of a blank form.
+      const lastUsed = await cvApi.getLastUsedCv()
+      if (lastUsed) hydrateFrom(lastUsed)
+    }
+  } catch {
+    // Fetch failed (e.g. deleted CV) - fall back to a blank form rather than blocking the page.
+  } finally {
+    loadingExisting.value = false
+  }
+})
+
+async function saveCv() {
+  formError.value = ''
+  saving.value = true
+  try {
+    const payload = {
+      cvName: cvName.value.trim() || `${form.value.professionalTitle || 'Untitled'} CV`,
+      templateId: selectedTemplate.value,
+      headline: form.value.professionalTitle,
+      summary: form.value.summary,
+      fullName: form.value.fullName,
+      email: form.value.email,
+      phone: form.value.phone,
+      location: form.value.location,
+      professionalTitle: form.value.professionalTitle,
+      photo: form.value.photo,
+      education: education.value,
+      experiences: experiences.value,
+      skills: skills.value,
+    }
+    const saved = cvId.value ? await cvApi.updateCv(cvId.value, payload) : await cvApi.createCv(payload)
+    await cvApi.setLastUsedCv(saved.id)
+    toast.success('CV saved successfully.')
+    router.push({ path: '/dashboard/view-cv', query: { cv: saved.id } })
+  } catch (error) {
+    formError.value = error instanceof ApiRequestError ? error.message : 'Could not save your CV. Please try again.'
+  } finally {
+    saving.value = false
+  }
 }
 
 const steps = [
@@ -227,7 +266,12 @@ const downloadPdf = () => window.print()
         </p>
       </section>
 
-      <div class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1fr_460px]">
+      <div v-if="loadingExisting" class="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_460px]">
+        <Skeleton variant="card" height="24rem" />
+        <Skeleton variant="card" height="24rem" />
+      </div>
+
+      <div v-else class="grid grid-cols-1 items-start gap-5 xl:grid-cols-[1fr_460px]">
         <!-- LEFT: FORM -->
         <div class="space-y-4 no-print">
           <!-- Steps -->
@@ -274,6 +318,11 @@ const downloadPdf = () => window.print()
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
+              <div class="md:col-span-2">
+                <label class="mb-1.5 block text-sm font-medium">CV Name *</label>
+                <input v-model="cvName" class="cv-input" type="text" placeholder="e.g. Frontend Developer CV" />
+              </div>
+
               <div>
                 <label class="mb-1.5 block text-sm font-medium">Full Name *</label>
                 <input v-model="form.fullName" class="cv-input" type="text" />
@@ -524,13 +573,15 @@ const downloadPdf = () => window.print()
               </p>
             </div>
 
+            <p v-if="formError" class="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{{ formError }}</p>
+
             <div class="mt-7 flex justify-between border-t pt-4">
               <button type="button" class="cv-secondary-button" @click="previousStep">
                 <ArrowLeft :size="16" /> Previous
               </button>
-              <button type="button" class="cv-primary-button" @click="downloadPdf">
-                <Download :size="16" /> Download CV
-              </button>
+              <AppButton :loading="saving" @click="saveCv">
+                Save CV
+              </AppButton>
             </div>
           </section>
         </div>

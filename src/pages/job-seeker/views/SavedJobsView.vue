@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import {
   Bookmark,
   MapPin,
@@ -7,92 +7,58 @@ import {
   Clock3,
   Search,
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-vue-next'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
+import EmptyState from '../../../components/ui/EmptyState.vue'
+import Skeleton from '../../../components/ui/Skeleton.vue'
+import * as jobsApi from '../../../api/jobs'
+import * as applicationsApi from '../../../api/applications'
+import { useToast } from '../../../composables/useToast'
 
+const toast = useToast()
 const searchText = ref('')
-const activeTab = ref('all')
 const sortBy = ref('newest')
+const loading = ref(true)
+const jobs = ref([])
+const appliedJobIds = ref(new Set())
 
-const savedJobs = ref([
-  {
-    id: 1,
-    title: 'Frontend Developer',
-    company: 'Google',
-    location: 'Dar es Salaam, Tanzania',
-    type: 'Full time',
-    salary: 'TSh 1,500,000 - 2,500,000',
-    posted: 'Posted 2 days ago',
-    description: 'We are looking for a skilled frontend Developer to join our team and help build amazing products for millions of users',
-    logo: 'G',
-    logoBg: '#e8f0fe',
-    logoColor: '#1a73e8',
-    status: 'Saved',
-    category: 'active',
-  },
-  {
-    id: 2,
-    title: 'Full Stack Developer',
-    company: 'TechSolution Ltd',
-    location: 'Dar es Salaam, Tanzania',
-    type: 'Full time',
-    salary: 'TSh 1,200,000 - 2,000,000',
-    posted: 'Posted 5 days ago',
-    description: 'We are looking for a talented Full Stack Developer with experience in Modern web technologies to join our growing team.',
-    logo: 'T',
-    logoBg: '#eee7ff',
-    logoColor: '#7138e8',
-    status: 'Saved',
-    category: 'active',
-  },
-  {
-    id: 3,
-    title: 'Customer Care Agency',
-    company: 'Vodacom Tanzania',
-    location: 'Dar es Salaam, Tanzania',
-    type: 'Full time',
-    salary: 'TSh 600,000 - 900,000',
-    posted: 'Posted 6 days ago',
-    description: 'Join our customer care team and help us deliver world class support to our valued customer',
-    logo: 'V',
-    logoBg: '#ffe5e5',
-    logoColor: '#e60000',
-    status: 'Applied',
-    category: 'applied',
-  },
-])
+async function load() {
+  loading.value = true
+  try {
+    const result = await jobsApi.listJobs({ savedOnly: true, search: searchText.value, pageSize: 100 })
+    let items = result.items
+    if (sortBy.value === 'oldest') items = [...items].reverse()
+    else if (sortBy.value === 'salary') items = [...items].sort((a, b) => b.salaryMax - a.salaryMax)
+    jobs.value = items
 
-const filteredJobs = computed(() => {
-  let result = savedJobs.value
-
-  // Tab filter
-  if (activeTab.value === 'active') {
-    result = result.filter(j => j.category === 'active')
-  } else if (activeTab.value === 'applied') {
-    result = result.filter(j => j.category === 'applied')
-  } else if (activeTab.value === 'expired') {
-    result = result.filter(j => j.category === 'expired')
+    const appliedChecks = await Promise.all(items.map((job) => applicationsApi.hasAppliedTo(job.id)))
+    appliedJobIds.value = new Set(items.filter((_, i) => appliedChecks[i]).map((job) => job.id))
+  } catch {
+    toast.error('Could not load saved jobs.')
+  } finally {
+    loading.value = false
   }
+}
 
-  // Search filter
-  const query = searchText.value.trim().toLowerCase()
-  if (query) {
-    result = result.filter((job) =>
-      [job.title, job.company, job.location, job.description]
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-    )
+async function removeSavedJob(job) {
+  const previous = jobs.value
+  jobs.value = jobs.value.filter((j) => j.id !== job.id)
+  try {
+    await jobsApi.unsaveJob(job.id)
+  } catch {
+    jobs.value = previous
+    toast.error('Could not remove this job. Please try again.')
   }
+}
 
-  return result
+watch(sortBy, load)
+let debounceTimer = null
+watch(searchText, () => {
+  window.clearTimeout(debounceTimer)
+  debounceTimer = window.setTimeout(load, 300)
 })
 
-function removeSavedJob(id) {
-  savedJobs.value = savedJobs.value.filter((job) => job.id !== id)
-}
+onMounted(load)
 </script>
 
 <template>
@@ -150,73 +116,31 @@ function removeSavedJob(id) {
             </div>
           </div>
         </div>
-
-        <!-- Filter Tabs -->
-        <div class="mt-6 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-5">
-          <button
-            @click="activeTab = 'all'"
-            :class="[
-              'rounded-xl px-4 py-2 text-xs font-semibold transition',
-              activeTab === 'all'
-                ? 'bg-orange-600 text-white shadow-sm'
-                : 'bg-orange-50/50 text-orange-700 hover:bg-orange-100/60 border border-orange-200/60'
-            ]"
-          >
-            All Saved ({{ savedJobs.length }})
-          </button>
-          <button
-            @click="activeTab = 'active'"
-            :class="[
-              'rounded-xl px-4 py-2 text-xs font-semibold transition',
-              activeTab === 'active'
-                ? 'bg-orange-600 text-white shadow-sm'
-                : 'bg-orange-50/50 text-orange-700 hover:bg-orange-100/60 border border-orange-200/60'
-            ]"
-          >
-            Active ({{ savedJobs.filter(j => j.category === 'active').length }})
-          </button>
-          <button
-            @click="activeTab = 'expired'"
-            :class="[
-              'rounded-xl px-4 py-2 text-xs font-semibold transition',
-              activeTab === 'expired'
-                ? 'bg-orange-600 text-white shadow-sm'
-                : 'bg-orange-50/50 text-orange-700 hover:bg-orange-100/60 border border-orange-200/60'
-            ]"
-          >
-            Expired (0)
-          </button>
-          <button
-            @click="activeTab = 'applied'"
-            :class="[
-              'rounded-xl px-4 py-2 text-xs font-semibold transition',
-              activeTab === 'applied'
-                ? 'bg-orange-600 text-white shadow-sm'
-                : 'bg-orange-50/50 text-orange-700 hover:bg-orange-100/60 border border-orange-200/60'
-            ]"
-          >
-            Applied ({{ savedJobs.filter(j => j.category === 'applied').length }})
-          </button>
-        </div>
       </header>
 
+      <template v-if="loading">
+        <div class="space-y-4">
+          <Skeleton v-for="i in 3" :key="i" variant="card" height="7rem" />
+        </div>
+      </template>
+
       <!-- Saved Job Cards List -->
-      <div v-if="filteredJobs.length" class="space-y-4">
+      <div v-else-if="jobs.length" class="space-y-4">
         <article
-          v-for="job in filteredJobs"
+          v-for="job in jobs"
           :key="job.id"
           class="group relative rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md"
           style="border-color: #ffd3bd"
         >
           <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            
+
             <!-- Left Group: Logo, Title, Company, Meta, & Description -->
             <div class="flex items-start gap-4 min-w-0 flex-1">
               <div
                 class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-lg font-bold shadow-sm"
-                :style="{ backgroundColor: job.logoBg, color: job.logoColor }"
+                :style="{ backgroundColor: job.companyColor + '1a', color: job.companyColor }"
               >
-                {{ job.logo }}
+                {{ job.companyInitials }}
               </div>
 
               <div class="min-w-0 flex-1">
@@ -237,10 +161,10 @@ function removeSavedJob(id) {
                     <MapPin :size="13" class="text-gray-400" /> {{ job.location }}
                   </span>
                   <span class="inline-flex items-center gap-1.5">
-                    <BriefcaseBusiness :size="13" class="text-gray-400" /> {{ job.type }}
+                    <BriefcaseBusiness :size="13" class="text-gray-400" /> {{ job.employmentType }}
                   </span>
                   <span class="inline-flex items-center gap-1.5">
-                    <Clock3 :size="13" class="text-gray-400" /> {{ job.posted }}
+                    <Clock3 :size="13" class="text-gray-400" /> Posted {{ new Date(job.postedAt).toLocaleDateString() }}
                   </span>
                 </div>
 
@@ -253,16 +177,16 @@ function removeSavedJob(id) {
 
             <!-- Right Group: Status Badge on Top of Salary, Followed by Action Button & Bookmark Icon -->
             <div class="flex flex-col lg:items-end justify-between gap-3 border-t lg:border-t-0 pt-3 lg:pt-0 border-gray-100 shrink-0">
-              
+
               <!-- Status Badge on Top -->
               <div class="flex items-center gap-3">
                 <span
                   :class="[
                     'inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold',
-                    job.status === 'Applied' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                    appliedJobIds.has(job.id) ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
                   ]"
                 >
-                  {{ job.status }}
+                  {{ appliedJobIds.has(job.id) ? 'Applied' : 'Saved' }}
                 </span>
 
                 <button
@@ -270,7 +194,7 @@ function removeSavedJob(id) {
                   class="rounded-xl p-1.5 text-orange-600 transition hover:bg-orange-50 shrink-0"
                   :aria-label="`Remove ${job.title} from saved jobs`"
                   title="Remove saved job"
-                  @click="removeSavedJob(job.id)"
+                  @click="removeSavedJob(job)"
                 >
                   <Bookmark :size="20" class="fill-orange-600" />
                 </button>
@@ -279,7 +203,7 @@ function removeSavedJob(id) {
               <!-- Salary Below Status -->
               <div>
                 <p class="text-xs font-bold text-gray-900">
-                  {{ job.salary }}
+                  {{ job.salaryCurrency }} {{ job.salaryMin.toLocaleString() }} - {{ job.salaryMax.toLocaleString() }}
                   <span class="font-normal text-gray-500">/ month</span>
                 </p>
               </div>
@@ -287,7 +211,7 @@ function removeSavedJob(id) {
               <!-- Action Button -->
               <div class="flex items-center gap-2 mt-1">
                 <RouterLink
-                  v-if="job.status === 'Applied'"
+                  v-if="appliedJobIds.has(job.id)"
                   to="/dashboard/applications"
                   class="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-700"
                 >
@@ -310,58 +234,14 @@ function removeSavedJob(id) {
       </div>
 
       <!-- Empty state -->
-      <section
+      <EmptyState
         v-else
-        class="rounded-2xl border bg-white px-5 py-16 text-center shadow-sm"
-        style="border-color: #ffd3bd"
-      >
-        <div
-          class="mx-auto flex h-14 w-14 items-center justify-center rounded-full shadow-sm"
-          style="background: #fff0e8; color: #ff5a0a"
-        >
-          <Bookmark :size="24" />
-        </div>
-
-        <h2 class="mt-4 text-base font-bold text-gray-900">
-          {{ savedJobs.length ? 'No matching saved jobs' : 'No saved jobs yet' }}
-        </h2>
-
-        <p class="mx-auto mt-1.5 max-w-sm text-xs text-gray-500">
-          {{
-            savedJobs.length
-              ? 'Try adjusting your search or tab filter.'
-              : 'Save jobs you are interested in and they will appear here.'
-          }}
-        </p>
-
-        <RouterLink
-          to="/dashboard/find-jobs"
-          class="mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-95"
-          style="background: #ff5a0a"
-        >
-          Browse Jobs <ArrowRight :size="16" />
-        </RouterLink>
-      </section>
-
-      <!-- Pagination Footer Matching Reference Picture Exactly -->
-      <div v-if="filteredJobs.length" class="flex items-center justify-between py-6">
-        <button class="flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-gray-600 transition">
-          <ChevronLeft :size="16" /> Previous
-        </button>
-
-        <div class="flex items-center gap-2">
-          <button class="h-8 w-8 rounded-xl bg-orange-600 text-xs font-bold text-white shadow-sm flex items-center justify-center">1</button>
-          <button class="h-8 w-8 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition flex items-center justify-center">2</button>
-          <button class="h-8 w-8 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition flex items-center justify-center">3</button>
-          <span class="px-1 text-gray-400 font-medium">...</span>
-          <button class="h-8 w-8 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition flex items-center justify-center">67</button>
-          <button class="h-8 w-8 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-100 transition flex items-center justify-center">68</button>
-        </div>
-
-        <button class="flex items-center gap-1 text-xs font-semibold text-gray-800 hover:text-orange-600 transition">
-          Next <ChevronRight :size="16" />
-        </button>
-      </div>
+        :icon="Bookmark"
+        title="No saved jobs yet"
+        description="Save jobs you are interested in and they will appear here."
+        action-label="Browse Jobs"
+        @action="$router.push('/dashboard/find-jobs')"
+      />
 
     </div>
   </DashboardLayout>

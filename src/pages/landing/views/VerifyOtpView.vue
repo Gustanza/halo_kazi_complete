@@ -3,9 +3,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ShieldCheck, MessageSquareText } from 'lucide-vue-next'
 import AuthSplitLayout from '../components/auth/AuthSplitLayout.vue'
+import { useAuthStore } from '../../../stores/auth'
+import { ApiRequestError } from '../../../api/http'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const phone = String(route.query.phone || '')
 const role = String(route.query.role || 'job_seeker')
@@ -13,8 +16,11 @@ const name = String(route.query.name || '')
 
 const code = ref('')
 const verified = ref(false)
-const resendCooldown = ref(30)
+const resendCooldown = ref(Number(route.query.resendAvailableInSeconds) || 30)
 const shake = ref(false)
+const submitting = ref(false)
+const resending = ref(false)
+const formError = ref('')
 let timer = null
 
 onMounted(() => {
@@ -38,25 +44,44 @@ const maskedPhone = computed(() => {
   return `+255 ${phone.slice(0, -4).replace(/./g, '•')}${phone.slice(-4)}`
 })
 
-function resend() {
-  if (resendCooldown.value > 0) return
-  resendCooldown.value = 30
+async function resend() {
+  if (resendCooldown.value > 0 || resending.value) return
+  resending.value = true
+  formError.value = ''
+  try {
+    const result = await auth.resendOtp({ phone })
+    resendCooldown.value = result.resendAvailableInSeconds
+  } catch (error) {
+    formError.value = error instanceof ApiRequestError ? error.message : 'Could not resend the code.'
+  } finally {
+    resending.value = false
+  }
 }
 
-function handleVerify() {
-  // No SMS backend yet - any non-empty code "verifies" the account here, matching
-  // the TO-BE flow's requirement that an account must pass System verification
-  // before it can log in, while the real OTP gateway is not yet wired up.
+async function handleVerify() {
+  formError.value = ''
   if (!code.value.trim()) {
     shake.value = true
     window.setTimeout(() => (shake.value = false), 400)
     return
   }
-  if (role === 'employer') {
-    verified.value = true
-    return
+  submitting.value = true
+  try {
+    const result = await auth.verifyOtp({ phone, code: code.value.trim() })
+    if (result.user.role === 'EMPLOYER') {
+      // Employer accounts also need Admin verification (TIN/licence review) before the
+      // employer portal opens, so show the pending-review state instead of a dashboard.
+      verified.value = true
+    } else {
+      router.push('/dashboard')
+    }
+  } catch (error) {
+    shake.value = true
+    window.setTimeout(() => (shake.value = false), 400)
+    formError.value = error instanceof ApiRequestError ? error.message : 'Verification failed. Please try again.'
+  } finally {
+    submitting.value = false
   }
-  router.push('/dashboard')
 }
 </script>
 
@@ -92,17 +117,21 @@ function handleVerify() {
             />
           </div>
 
-          <button type="submit" class="btn-primary w-full">Verify &amp; Continue</button>
+          <p v-if="formError" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10">{{ formError }}</p>
+
+          <button type="submit" class="btn-primary w-full" :disabled="submitting">
+            {{ submitting ? 'Verifying…' : 'Verify & Continue' }}
+          </button>
         </form>
 
         <button
           type="button"
           class="mt-4 w-full text-center text-sm font-medium transition-colors"
-          :style="resendCooldown > 0 ? 'color: var(--color-text-muted)' : 'color: #FD5C20'"
-          :disabled="resendCooldown > 0"
+          :style="resendCooldown > 0 || resending ? 'color: var(--color-text-muted)' : 'color: #FD5C20'"
+          :disabled="resendCooldown > 0 || resending"
           @click="resend"
         >
-          {{ resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code' }}
+          {{ resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : resending ? 'Resending…' : 'Resend code' }}
         </button>
       </div>
 

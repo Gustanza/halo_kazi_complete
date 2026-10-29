@@ -1,5 +1,8 @@
-<script setup></script>
+<script setup>
+import Toast from './components/ui/Toast.vue'
+</script>
 
 <template>
   <RouterView />
+  <Toast />
 </template>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import {
   Briefcase,
   Building2,
@@ -34,9 +34,51 @@ import EmployerCard from '../components/employers/EmployerCard.vue'
 import TemplateThumb from '../components/cv/TemplateThumb.vue'
 import StepCard from '../components/cv/StepCard.vue'
 
-import { jobs, totalJobPages } from '../data/jobs'
-import { employers } from '../data/employers'
-import { cvTemplates } from '../data/cvTemplates'
+import * as jobsApi from '../../../api/jobs'
+import * as cvApi from '../../../api/cv'
+import * as employersApi from '../../../api/employers'
+
+const JOBS_PAGE_SIZE = 5
+const currentPage = ref(1)
+const jobs = ref([])
+const totalJobPages = ref(1)
+const employers = ref([])
+
+async function loadEmployers() {
+  employers.value = await employersApi.listTopEmployers({ limit: 5 })
+}
+
+async function loadJobs() {
+  const result = await jobsApi.listJobs({ page: currentPage.value, pageSize: JOBS_PAGE_SIZE })
+  // JobCard.vue expects {initials, brandColor, type} - keep that contract and just adapt
+  // the vacancy-shaped api response to it here, instead of touching the shared card.
+  jobs.value = result.items.map((job) => ({
+    id: job.id,
+    title: job.title,
+    company: job.company,
+    initials: job.companyInitials,
+    brandColor: job.companyColor,
+    location: job.location,
+    type: job.employmentType,
+  }))
+  totalJobPages.value = Math.max(1, Math.ceil(result.total / JOBS_PAGE_SIZE))
+}
+
+watch(currentPage, loadJobs)
+
+const cvTemplates = ref([])
+const selectedTemplate = ref(null)
+
+async function loadCvTemplates() {
+  cvTemplates.value = await cvApi.listTemplates()
+  selectedTemplate.value = cvTemplates.value[0]?.id ?? null
+}
+
+onMounted(() => {
+  loadJobs()
+  loadCvTemplates()
+  loadEmployers()
+})
 
 const heroStats = [
   { icon: Briefcase, value: '10K+', label: 'New jobs every day' },
@@ -52,16 +94,12 @@ const helpFeatures = [
   { icon: BarChart3, iconBg: '#2F8FF5', title: 'Track Application', description: 'Track your applications directly through our platform' },
 ]
 
-const currentPage = ref(1)
-
 const whyEmployerFeatures = [
   { icon: Users, iconBg: '#FD5C20', title: 'Access Top Talent', description: 'Reach thousands of qualified candidates across Tanzania in one place' },
   { icon: Send, iconBg: '#FD5C20', title: 'Easy recruitment', description: 'Post jobs, get best team and hire faster with our platform' },
   { icon: TrendingUp, iconBg: '#FD5C20', title: 'Smart matching', description: 'One platform connects you with the right candidates for your needs' },
   { icon: ShieldCheck, iconBg: '#FD5C20', title: 'Trusted platform', description: 'Verified employers and secure hiring process you can rely on' },
 ]
-
-const selectedTemplate = ref(cvTemplates[0].id)
 
 const cvSteps = [
   { icon: LayoutTemplate, title: 'Choose template', description: 'Pick a professional template you like' },

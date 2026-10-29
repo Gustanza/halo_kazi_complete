@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import {
   UserRound,
@@ -26,8 +26,13 @@ import {
 } from 'lucide-vue-next'
 
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
+import Skeleton from '../../../components/ui/Skeleton.vue'
+import { useAuthStore } from '../../../stores/auth'
+import * as profileApi from '../../../api/profile'
+import { useToast } from '../../../composables/useToast'
 
-const STORAGE_KEY = 'halokazi-cv-profile'
+const auth = useAuthStore()
+const toast = useToast()
 
 const steps = [
   { id: 'personalInfo', label: 'Personal Info', icon: UserRound },
@@ -39,19 +44,17 @@ const steps = [
 const activeStep = ref('personalInfo')
 const isEditing = ref(false)
 const saveMessage = ref('')
+const loading = ref(true)
+const saving = ref(false)
 
 const emptyProfile = () => ({
   personalInfo: {
-    firstName: 'John',
-    lastName: 'Mwangi',
-    email: 'john.mwangi@example.com',
-    phone: '+255 712 345 678',
-    dateOfBirth: '12 May 1992',
-    gender: 'Male',
+    dateOfBirth: '',
+    gender: '',
     nationality: 'Tanzania',
-    location: 'Dar es Salaam, Tanzania',
-    professionalTitle: 'Marketing Specialist',
-    summary: 'Results-driven marketing professional with 5+ years of experience in digital marketing, brand strategy and social media management.'
+    location: '',
+    professionalTitle: '',
+    summary: ''
   },
   education: [],
   experience: [],
@@ -65,61 +68,32 @@ function cloneData(data) {
   return JSON.parse(JSON.stringify(data))
 }
 
-function normalizeProfile(data = {}) {
-  const defaults = emptyProfile()
-
-  return {
-    ...defaults,
-    ...data,
-    personalInfo: {
-      ...defaults.personalInfo,
-      ...(data.personalInfo || {})
-    },
-    education: Array.isArray(data.education) ? data.education : [],
-    experience: Array.isArray(data.experience) ? data.experience : [],
-    skills: Array.isArray(data.skills) ? data.skills : []
+async function loadProfile() {
+  loading.value = true
+  try {
+    const data = await profileApi.getProfile()
+    profileData.value = data
+    originalData.value = cloneData(data)
+  } catch {
+    toast.error('Could not load your profile.')
+  } finally {
+    loading.value = false
   }
 }
 
-function loadProfile() {
+async function saveProfile() {
+  saving.value = true
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-
-    if (saved) {
-      profileData.value = normalizeProfile(JSON.parse(saved))
-    } else {
-      profileData.value = emptyProfile()
-    }
-
-    originalData.value = cloneData(profileData.value)
-  } catch (error) {
-    console.error('Could not load profile:', error)
-    profileData.value = emptyProfile()
-    originalData.value = emptyProfile()
-  }
-}
-
-function saveProfile() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profileData.value))
-
-    originalData.value = cloneData(profileData.value)
+    const saved = await profileApi.updateProfile(profileData.value)
+    profileData.value = saved
+    originalData.value = cloneData(saved)
     isEditing.value = false
     saveMessage.value = 'Your profile has been saved.'
-
-    window.dispatchEvent(new Event('halokazi-profile-updated'))
-
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: STORAGE_KEY,
-      newValue: JSON.stringify(profileData.value)
-    }))
-
-    window.setTimeout(() => {
-      saveMessage.value = ''
-    }, 3000)
-  } catch (error) {
-    console.error('Could not save profile:', error)
+    window.setTimeout(() => { saveMessage.value = '' }, 3000)
+  } catch {
     saveMessage.value = 'Unable to save. Please try again.'
+  } finally {
+    saving.value = false
   }
 }
 
@@ -191,18 +165,13 @@ function displayValue(value) {
 }
 
 const personalInfo = computed(() => profileData.value.personalInfo)
-
-const fullName = computed(() => {
-  const first = personalInfo.value.firstName || ''
-  const last = personalInfo.value.lastName || ''
-  return `${first} ${last}`.trim() || 'Your Name'
-})
+const fullName = computed(() => auth.user.value?.fullName || 'Your Name')
+const email = computed(() => auth.user.value?.email || '')
+const phone = computed(() => auth.user.value?.phone || '')
 
 const completedSections = computed(() => {
   let count = 0
-  const info = personalInfo.value
-
-  if (info.firstName && info.lastName && info.email) count++
+  if (fullName.value && email.value) count++
   if (profileData.value.education.some(item => item.qualification || item.institution)) count++
   if (profileData.value.experience.some(item => item.jobTitle || item.company)) count++
   if (profileData.value.skills.some(item => typeof item === 'string' ? item.trim() : item.name?.trim())) count++
@@ -212,25 +181,18 @@ const completedSections = computed(() => {
 
 const profileStrength = computed(() => Math.min(100, Math.round((completedSections.value / 4) * 100) || 80))
 
-function handleExternalUpdate() {
-  if (!isEditing.value) loadProfile()
-}
-
-onMounted(() => {
-  loadProfile()
-  window.addEventListener('storage', handleExternalUpdate)
-  window.addEventListener('halokazi-profile-updated', handleExternalUpdate)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('storage', handleExternalUpdate)
-  window.removeEventListener('halokazi-profile-updated', handleExternalUpdate)
-})
+onMounted(loadProfile)
 </script>
 
 <template>
   <DashboardLayout>
-    <div class="mx-auto max-w-7xl space-y-5 pb-12">
+    <div v-if="loading" class="mx-auto max-w-7xl space-y-5 pb-12">
+      <Skeleton variant="card" height="4.5rem" />
+      <Skeleton variant="card" height="10rem" />
+      <Skeleton variant="card" height="20rem" />
+    </div>
+
+    <div v-else class="mx-auto max-w-7xl space-y-5 pb-12">
 
       <!-- Heading -->
       <header class="rounded-2xl border bg-white px-6 py-5 shadow-sm" style="border-color: #ffd3bd">
@@ -249,7 +211,7 @@ onBeforeUnmount(() => {
             <div class="relative shrink-0">
               <img
                 src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80"
-                alt="John Mwangi"
+                :alt="fullName"
                 class="h-20 w-20 rounded-full object-cover shadow-sm sm:h-24 sm:w-24"
               />
               <span class="absolute bottom-0 right-0 flex h-7 w-7 items-center justify-center rounded-full bg-orange-600 text-white shadow-md border-2 border-white">
@@ -354,10 +316,10 @@ onBeforeUnmount(() => {
                 class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer">
                 <X :size="14" /> Cancel
               </button>
-              <button type="button" @click="saveProfile"
-                class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm cursor-pointer"
+              <button type="button" :disabled="saving" @click="saveProfile"
+                class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm cursor-pointer disabled:opacity-60"
                 style="background: #ff5a0a">
-                <Save :size="14" /> Save Changes
+                <Save :size="14" /> {{ saving ? 'Saving…' : 'Save Changes' }}
               </button>
             </template>
             <button v-else type="button" @click="startEditing"
@@ -375,20 +337,24 @@ onBeforeUnmount(() => {
         <div v-if="activeStep === 'personalInfo'" class="grid gap-4 sm:grid-cols-2">
           
           <label class="block text-xs font-bold text-gray-800">
-            First Name
-            <input v-if="isEditing" v-model="profileData.personalInfo.firstName" type="text" required
-              class="mt-1.5 block w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" />
-            <p v-else class="mt-1.5 min-h-[40px] rounded-xl bg-gray-50/70 border border-gray-100 px-3.5 py-2.5 text-xs font-normal text-gray-900 flex items-center">
-              {{ displayValue(personalInfo.firstName) }}
+            Full Name
+            <p class="mt-1.5 min-h-[40px] rounded-xl bg-gray-50/70 border border-gray-100 px-3.5 py-2.5 text-xs font-normal text-gray-900 flex items-center">
+              {{ fullName }}
+            </p>
+            <span class="mt-1 block text-[10px] font-normal text-gray-400">Change this from Settings &rarr; Account.</span>
+          </label>
+
+          <label class="block text-xs font-bold text-gray-800">
+            Email Address
+            <p class="mt-1.5 min-h-[40px] rounded-xl bg-gray-50/70 border border-gray-100 px-3.5 py-2.5 text-xs font-normal text-gray-900 flex items-center">
+              {{ displayValue(email) }}
             </p>
           </label>
 
           <label class="block text-xs font-bold text-gray-800">
-            Last Name
-            <input v-if="isEditing" v-model="profileData.personalInfo.lastName" type="text" required
-              class="mt-1.5 block w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100" />
-            <p v-else class="mt-1.5 min-h-[40px] rounded-xl bg-gray-50/70 border border-gray-100 px-3.5 py-2.5 text-xs font-normal text-gray-900 flex items-center">
-              {{ displayValue(personalInfo.lastName) }}
+            Phone Number
+            <p class="mt-1.5 min-h-[40px] rounded-xl bg-gray-50/70 border border-gray-100 px-3.5 py-2.5 text-xs font-normal text-gray-900 flex items-center">
+              {{ displayValue(phone) }}
             </p>
           </label>
 

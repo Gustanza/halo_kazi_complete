@@ -3,60 +3,33 @@ import { ref, onMounted } from 'vue'
 import { Check, Eye, ArrowRight } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
+import Skeleton from '../../../components/ui/Skeleton.vue'
+import * as cvApi from '../../../api/cv'
 
 const router = useRouter()
 
 const selectedTemplate = ref(null)
+const templates = ref([])
+const loading = ref(true)
 
-const templates = [
-  {
-    id: 1,
-    name: 'Professional',
-    description: 'Clean and professional design suitable for most careers.',
-    preview: 'professional',
-  },
-  {
-    id: 2,
-    name: 'Modern',
-    description: 'Modern layout with a stylish and attractive appearance.',
-    preview: 'modern',
-  },
-  {
-    id: 3,
-    name: 'Minimal',
-    description: 'Simple and clean design focused on your experience.',
-    preview: 'minimal',
-  },
-  {
-    id: 4,
-    name: 'Creative',
-    description: 'Creative layout for designers and creative professionals.',
-    preview: 'creative',
-  },
-  {
-    id: 5,
-    name: 'Simple',
-    description: 'Straightforward and easy-to-read professional CV.',
-    preview: 'simple',
-  },
-]
-
-onMounted(() => {
-  const savedId = Number(localStorage.getItem('cvSelectedTemplate'))
-
-  selectedTemplate.value =
-    templates.find(template => template.id === savedId) || null
+onMounted(async () => {
+  try {
+    const [list, lastUsed] = await Promise.all([cvApi.listTemplates(), cvApi.getLastUsedCv()])
+    templates.value = list
+    // Preselect the template behind the job seeker's last-used CV, per the 23 Oct 2026
+    // meeting decision to start a new CV from the last one instead of from scratch.
+    selectedTemplate.value = (lastUsed && list.find((t) => t.id === lastUsed.templateId)) || null
+  } finally {
+    loading.value = false
+  }
 })
 
 const chooseTemplate = (template) => {
   selectedTemplate.value = template
-  localStorage.setItem('cvSelectedTemplate', template.id)
 }
 
 const useTemplate = (template) => {
   selectedTemplate.value = template
-  localStorage.setItem('cvSelectedTemplate', template.id)
-
   router.push({
     path: '/dashboard/cv-template',
     query: {
@@ -86,7 +59,11 @@ const useTemplate = (template) => {
       </section>
 
       <!-- Templates -->
-      <section class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <section v-if="loading" class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <Skeleton v-for="i in 3" :key="i" variant="card" height="22rem" />
+      </section>
+
+      <section v-else class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <div
           v-for="template in templates"
           :key="template.id"

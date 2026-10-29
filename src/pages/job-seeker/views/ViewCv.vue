@@ -1,192 +1,71 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Download } from 'lucide-vue-next'
 import DashboardLayout from '../components/layout/DashboardLayout.vue'
+import Skeleton from '../../../components/ui/Skeleton.vue'
+import * as cvApi from '../../../api/cv'
 
 const route = useRoute()
 const router = useRouter()
 
-const templates = {
-  1: {
-    name: 'Professional',
-    layout: 'sidebar',
-    sidebar: 'bg-blue-700',
-    heading: 'text-blue-700',
-  },
-  2: {
-    name: 'Modern',
-    layout: 'sidebar',
-    sidebar: 'bg-orange-600',
-    heading: 'text-orange-600',
-  },
-  3: {
-    name: 'Minimal',
-    layout: 'minimal',
-    sidebar: 'bg-slate-100',
-    heading: 'text-slate-800',
-  },
-  4: {
-    name: 'Creative',
-    layout: 'sidebar',
-    sidebar: 'bg-purple-700',
-    heading: 'text-purple-700',
-  },
-  5: {
-    name: 'Simple',
-    layout: 'minimal',
-    sidebar: 'bg-slate-100',
-    heading: 'text-slate-800',
-  },
+// Presentational layout metadata only (not CV data) for the 5 templates CvTemplate.vue builds.
+const LAYOUTS = {
+  1: { name: 'Professional', layout: 'sidebar', sidebar: 'bg-blue-700', heading: 'text-blue-700' },
+  2: { name: 'Modern', layout: 'sidebar', sidebar: 'bg-orange-600', heading: 'text-orange-600' },
+  3: { name: 'Minimal', layout: 'minimal', sidebar: 'bg-slate-100', heading: 'text-slate-800' },
+  4: { name: 'Creative', layout: 'sidebar', sidebar: 'bg-purple-700', heading: 'text-purple-700' },
+  5: { name: 'Simple', layout: 'minimal', sidebar: 'bg-slate-100', heading: 'text-slate-800' },
 }
 
-const cvRecords = {
-  1: {
-    name: 'John Mwangi',
-    job: 'Marketing Specialist',
-    email: 'john.mwangi@email.com',
-    phone: '+255 624023920',
-    location: 'Dar es Salaam, Tanzania',
-    summary:
-      'Results-driven professional with experience in marketing, communication and business development.',
-    skills: ['Digital Marketing', 'Communication', 'SEO', 'Teamwork'],
-    experiences: [
-      {
-        role: 'Marketing Specialist',
-        company: 'ABC Company',
-        period: '2022 - Present',
-        description:
-          'Developed marketing campaigns and managed digital platforms.',
-      },
-    ],
-    education: [
-      {
-        course: 'Bachelor Degree',
-        school: 'University of Dar es Salaam',
-        period: '2018 - 2021',
-      },
-    ],
-  },
+const loading = ref(true)
+const record = ref(null)
 
-  2: {
-    name: 'Jane Joseph',
-    job: 'Graphic Designer',
-    email: 'jane@example.com',
-    phone: '+255 700000000',
-    location: 'Dar es Salaam, Tanzania',
-    summary:
-      'Creative designer focused on visual communication and digital design.',
-    skills: ['UI Design', 'Photoshop', 'Illustrator', 'Creativity'],
-    experiences: [
-      {
-        role: 'Graphic Designer',
-        company: 'Creative Studio',
-        period: '2023 - Present',
-        description:
-          'Designed brand identities and digital marketing materials.',
-      },
-    ],
-    education: [
-      {
-        course: 'Diploma in Graphic Design',
-        school: 'Design Institute',
-        period: '2020 - 2022',
-      },
-    ],
-  },
+onMounted(async () => {
+  const cvId = route.query.cv
+  if (!cvId) {
+    router.replace('/dashboard/my-cvs')
+    return
+  }
+  try {
+    record.value = await cvApi.getCv(cvId)
+  } catch {
+    router.replace('/dashboard/my-cvs')
+    return
+  } finally {
+    loading.value = false
+  }
+})
 
-  3: {
-    name: 'Michael Peter',
-    job: 'Software Developer',
-    email: 'michael@example.com',
-    phone: '+255 711000000',
-    location: 'Arusha, Tanzania',
-    summary:
-      'Software developer interested in building reliable and user-friendly applications.',
-    skills: ['Vue.js', 'Laravel', 'JavaScript', 'SQL'],
-    experiences: [
-      {
-        role: 'Junior Developer',
-        company: 'Tech Company',
-        period: '2023 - Present',
-        description:
-          'Built and maintained web application features.',
-      },
-    ],
-    education: [
-      {
-        course: 'Bachelor of Computer Science',
-        school: 'University',
-        period: '2019 - 2022',
-      },
-    ],
-  },
+const templateId = computed(() => record.value?.templateId || 1)
 
-  4: {
-    name: 'Sarah James',
-    job: 'UI/UX Designer',
-    email: 'sarah@example.com',
-    phone: '+255 722000000',
-    location: 'Dodoma, Tanzania',
-    summary:
-      'Creative professional who designs accessible and engaging user experiences.',
-    skills: ['Figma', 'Prototyping', 'Research', 'Wireframing'],
-    experiences: [
-      {
-        role: 'UI/UX Designer',
-        company: 'Digital Agency',
-        period: '2022 - Present',
-        description:
-          'Created wireframes, prototypes and user interface designs.',
-      },
-    ],
-    education: [
-      {
-        course: 'Bachelor of Information Technology',
-        school: 'University',
-        period: '2018 - 2021',
-      },
-    ],
-  },
+const template = computed(() => LAYOUTS[templateId.value] || LAYOUTS[1])
 
-  5: {
-    name: 'David John',
-    job: 'Administrative Assistant',
-    email: 'david@example.com',
-    phone: '+255 733000000',
-    location: 'Mwanza, Tanzania',
-    summary:
-      'Organized professional with strong communication and administrative skills.',
-    skills: ['Organization', 'Communication', 'Microsoft Office'],
-    experiences: [
-      {
-        role: 'Administrative Assistant',
-        company: 'Business Office',
-        period: '2021 - Present',
-        description:
-          'Coordinated records, schedules and daily office activities.',
-      },
-    ],
-    education: [
-      {
-        course: 'Diploma in Business Administration',
-        school: 'Business College',
-        period: '2018 - 2020',
-      },
-    ],
-  },
-}
-
-const templateId = computed(() => Number(route.query.template) || 1)
-const cvId = computed(() => Number(route.query.cv) || 1)
-
-const template = computed(
-  () => templates[templateId.value] || templates[1],
-)
-
-const cv = computed(
-  () => cvRecords[cvId.value] || cvRecords[1],
-)
+// Normalizes the CV record's field names (fullName/jobTitle/degree/...) into the shape
+// this view's existing markup expects (name/role/course/...).
+const cv = computed(() => {
+  if (!record.value) return null
+  return {
+    name: record.value.fullName,
+    job: record.value.professionalTitle,
+    email: record.value.email,
+    phone: record.value.phone,
+    location: record.value.location,
+    summary: record.value.summary,
+    skills: record.value.skills,
+    experiences: (record.value.experiences || []).map((item) => ({
+      role: item.jobTitle,
+      company: item.company,
+      period: `${item.startDate} - ${item.endDate}`,
+      description: item.description,
+    })),
+    education: (record.value.education || []).map((item) => ({
+      course: item.degree,
+      school: item.institution,
+      period: `${item.startYear} - ${item.endYear}`,
+    })),
+  }
+})
 
 function backToMyCvs() {
   router.push('/dashboard/my-cvs')
@@ -235,8 +114,14 @@ function downloadPdf() {
         </div>
       </section>
 
+      <!-- Loading -->
+      <div v-if="loading" class="mx-auto w-full max-w-4xl">
+        <Skeleton variant="card" height="32rem" />
+      </div>
+
       <!-- CV Preview -->
       <div
+        v-else-if="cv"
         class="cv-print-area mx-auto w-full max-w-4xl overflow-hidden bg-white shadow-lg"
       >
 
