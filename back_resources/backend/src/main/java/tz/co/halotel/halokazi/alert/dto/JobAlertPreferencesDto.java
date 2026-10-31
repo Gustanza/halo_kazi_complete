@@ -1,13 +1,23 @@
 package tz.co.halotel.halokazi.alert.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.util.ArrayList;
 import java.util.List;
 
+@Schema(description = "Job alert subscription preferences")
 public class JobAlertPreferencesDto {
 
+    @Schema(description = "Whether to receive automated job alert notifications", example = "true")
     private boolean receiveJobAlerts;
+
+    @Schema(description = "List of preferred Job Category IDs", example = "[1, 2]")
     private List<Long> categoryIds = new ArrayList<>();
+
+    @Schema(description = "List of preferred Region IDs", example = "[7]")
     private List<Long> regionIds = new ArrayList<>();
+
+    @Schema(description = "List of preferred Employment Type IDs", example = "[1]")
     private List<Long> employmentTypeIds = new ArrayList<>();
 
     public JobAlertPreferencesDto() {
